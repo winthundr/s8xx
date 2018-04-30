@@ -46,6 +46,9 @@ makeinstall_target() {
     cp $ROOT/$PKG_BUILD/.$TARGET_NAME/oscam $INSTALL/usr/bin
     cp $ROOT/$PKG_BUILD/.$TARGET_NAME/utils/list_smargo $INSTALL/usr/bin
     cp $PKG_DIR/scripts/* $INSTALL/usr/bin
+
+  mkdir -p $INSTALL/usr/share/services
+    cp -P $PKG_DIR/default.d/*.conf $INSTALL/usr/share/services
 }
 
 post_install() {

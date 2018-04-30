@@ -1,0 +1,9 @@
+[Unit]
+Description=Oscam Daemon defaults
+ConditionPathExists=!/storage/.cache/services/oscam.conf
+ConditionPathExists=!/storage/.cache/services/oscam.disabled
+
+[Service]
+Type=oneshot
+ExecStart=/bin/cp /usr/share/services/oscam.conf /storage/.cache/services/
+RemainAfterExit=yes

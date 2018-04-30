@@ -1,6 +1,7 @@
 [Unit]
 Description=Oscam Daemon
-After=network-online.target
+After=network-online.target oscam-defaults.service
+Requires=oscam-defaults.service
 Before=kodi.service tvip.service
 Wants=network-online.target
 ConditionPathExists=/storage/.cache/services/oscam.conf
