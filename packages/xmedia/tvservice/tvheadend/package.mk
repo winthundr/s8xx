@@ -101,6 +101,9 @@ post_makeinstall_target() {
   #TTV IPTV config
   mkdir -p $INSTALL/usr/share/tvheadend
     cp -a $PKG_DIR/ttv/iptv $INSTALL/usr/share/tvheadend
+
+  mkdir -p $INSTALL/usr/share/services
+    cp -P $PKG_DIR/default.d/*.conf $INSTALL/usr/share/services
 }
 
 post_install() {

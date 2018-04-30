@@ -1,0 +1,9 @@
+[Unit]
+Description=Tvheadend Daemon defaults
+ConditionPathExists=!/storage/.cache/services/tvheadend.conf
+ConditionPathExists=!/storage/.cache/services/tvheadend.disabled
+
+[Service]
+Type=oneshot
+ExecStart=/bin/cp /usr/share/services/tvheadend.conf /storage/.cache/services/
+RemainAfterExit=yes
