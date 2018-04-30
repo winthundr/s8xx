@@ -1,7 +1,6 @@
 [Unit]
 Description=Samba SMB Daemon
-After=network.target smbd-defaults.service
-Requires=smbd-defaults.service
+After=network.target
 ConditionPathExists=/storage/.cache/services/samba.conf
 
 [Service]
