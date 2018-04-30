@@ -11,14 +11,14 @@ fi
 
 # determines PROJECT, if not forced by user (S805, S812)
 if [ -z "$PROJECT" ]; then
-  PROJECT="S812"
+  PROJECT="S805"
 else
   PROJECT="$PROJECT"
 fi
 
 # determines DEVICE, if not forced by user
 if [ -z "$DEVICE" ]; then
-  [ "$PROJECT" = "S805" ] && DEVICE="TX1"                   # VANDER, TX1, MXQ_V31, MXQ_V20
+  [ "$PROJECT" = "S805" ] && DEVICE="MXQ_V20"               # VANDER, TX1, MXQ_V31, MXQ_V20
   [ "$PROJECT" = "S812" ] && DEVICE="A400"                  # Qintex, M8SPlus, M8S, MXIII_G, A400
 else
   DEVICE="$DEVICE"
