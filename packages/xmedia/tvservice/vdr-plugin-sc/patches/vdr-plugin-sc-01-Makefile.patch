@@ -1,0 +1,41 @@
+diff -Naurp vdr-plugin-sc-a6fc7dc/Makefile vdr-plugin-sc-a6fc7dc-patch/Makefile
+--- vdr-plugin-sc-a6fc7dc/Makefile	2014-11-06 00:35:48.000000000 +0200
++++ vdr-plugin-sc-a6fc7dc-patch/Makefile	2017-07-24 10:20:15.000000000 +0300
+@@ -77,12 +77,18 @@ OBJS = $(PLUGIN).o data.o filter.o syste
+ # max number of CAIDs per slot
+ MAXCAID := 64
+ 
++ifndef LIBDVBCSA
+ # FFdeCSA
+ PARALLEL   ?= PARALLEL_128_SSE2
+ CSAFLAGS   ?= -fexpensive-optimizations -fomit-frame-pointer -funroll-loops -O3 -mmmx -msse -msse2 -msse3
+ FFDECSADIR  = FFdecsa
+ FFDECSA     = $(FFDECSADIR)/FFdecsa.o
+ DECSALIB    = $(FFDECSA)
++else
++# libdvbcsa
++DECSALIB    = -ldvbcsa
++DEFINES    += -DLIBDVBCSA
++endif
+ 
+ ### The main target:
+ 
+@@ -148,11 +154,18 @@ install-i18n: $(I18Nmsgs)
+ 
+ ### Targets:
+ 
++ifndef LIBDVBCSA
+ $(SOFILE): $(OBJS) $(FFDECSA)
+ 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -shared $(OBJS) $(FFDECSA) $(LIBS) -o $@
++else
++$(SOFILE): $(OBJS)
++	$(CXX) $(CXXFLAGS) $(LDFLAGS) -shared $(OBJS) $(DECSALIB) $(LIBS) -o $@
++endif
+ 
++ifndef LIBDVBCSA
+ $(FFDECSA): $(FFDECSADIR)/*.c $(FFDECSADIR)/*.h
+ 	@$(MAKE) COMPILER="$(CXX)" FLAGS="$(CXXFLAGS) $(CSAFLAGS)" PARALLEL_MODE=$(PARALLEL) -C $(FFDECSADIR) all
++endif
+ 
+ install-lib: $(SOFILE)
+ 	install -D $^ $(DESTDIR)$(LIBDIR)/$^.$(APIVERSION)

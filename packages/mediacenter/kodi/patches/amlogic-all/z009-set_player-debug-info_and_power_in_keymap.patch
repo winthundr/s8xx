@@ -1,0 +1,27 @@
+diff -Naurp kodi-17.2-rc1-274fed4/system/keymaps/keyboard.xml kodi-17.2-rc1-274fed4-patch/system/keymaps/keyboard.xml
+--- kodi-17.2-rc1-274fed4/system/keymaps/keyboard.xml	2017-05-10 19:51:33.000000000 +0300
++++ kodi-17.2-rc1-274fed4-patch/system/keymaps/keyboard.xml	2017-05-11 10:21:02.000000000 +0300
+@@ -52,6 +52,7 @@
+       <m>Menu</m>
+       <n mod="ctrl">ActivateWindow(PlayerControls)</n>
+       <s>ActivateWindow(ShutdownMenu)</s>
++      <s mod="longpress">ShutDown()</s>
+       <escape>Back</escape>
+       <escape mod="longpress">Back</escape>
+       <i>Info</i>
+@@ -95,6 +96,7 @@
+       <home>FirstPage</home>
+       <end>LastPage</end>
+       <power>ActivateWindow(ShutdownMenu)</power>
++      <power mod="longpress">ShutDown()</power>
+       <sleep>ActivateWindow(ShutdownMenu)</sleep>
+       <!-- PVR windows -->
+       <e>ActivateWindow(TVGuide)</e>
+@@ -352,6 +354,7 @@
+       <menu>OSD</menu>
+       <i>Info</i>
+       <o>PlayerProcessInfo</o>
++      <o mod="longpress">PlayerDebug</o>
+       <o mod="ctrl,shift">PlayerDebug</o>
+       <z>AspectRatio</z>
+       <zoom>AspectRatio</zoom>

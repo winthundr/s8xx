@@ -1,0 +1,93 @@
+#!/bin/sh
+################################################################################
+#      This file is part of Alex@ELEC - http://www.alexelec.in.ua
+#      Copyright (C) 2011-present Alexandr Zuyev (alex@alexelec.in.ua)
+################################################################################
+
+
+# hack: make addon-bins executable
+# done in kodi on addon install. but just in case..
+chmod +x /storage/.kodi/addons/*/bin/*
+
+# setup Kodi sources
+if [ ! -f $HOME/.kodi/userdata/sources.xml ]; then
+  if [ -f /usr/share/kodi/config/sources.xml ]; then
+    cp /usr/share/kodi/config/sources.xml $HOME/.kodi/userdata
+  fi
+fi
+
+# common setup guisettings
+if [ ! -f $HOME/.kodi/userdata/guisettings.xml ] ; then
+  if [ -f /usr/share/kodi/config/guisettings.xml ]; then
+    cp /usr/share/kodi/config/guisettings.xml $HOME/.kodi/userdata
+  fi
+fi
+
+# add/update AlexELEC addons
+if [ ! -d $HOME/.kodi/addons ] || [ -f $HOME/.kodi/update.addons ]; then
+  rm -f $HOME/.kodi/update.addons
+  if [ -e /usr/share/kodi/config/addons-alexelec/plugins.tbz2 ]; then
+    mkdir -p $HOME/.kodi/addons
+    tar xjf /usr/share/kodi/config/addons-alexelec/plugins.tbz2 -C $HOME/.kodi/addons
+  fi
+fi
+
+# add default addons settings
+if [ ! -d $HOME/.kodi/userdata/addon_data/weather.gismeteo ]; then
+  if [ -d /usr/share/kodi/config/weather.gismeteo ]; then
+    mkdir -p $HOME/.kodi/userdata/addon_data
+    cp -R /usr/share/kodi/config/weather.gismeteo $HOME/.kodi/userdata/addon_data
+  fi
+fi
+
+if [ ! -d $HOME/.kodi/userdata/addon_data/script.skinshortcuts ]; then
+  if [ -d /usr/share/kodi/config/script.skinshortcuts ]; then
+    mkdir -p $HOME/.kodi/userdata/addon_data
+    cp -R /usr/share/kodi/config/script.skinshortcuts $HOME/.kodi/userdata/addon_data
+  fi
+fi
+
+if [ ! -d $HOME/.kodi/userdata/addon_data/skin.aeon.nox.5ae ]; then
+  if [ -d /usr/share/kodi/config/skin.aeon.nox.5ae ]; then
+    mkdir -p $HOME/.kodi/userdata/addon_data
+    cp -R /usr/share/kodi/config/skin.aeon.nox.5ae $HOME/.kodi/userdata/addon_data
+  fi
+fi
+
+if [ ! -d $HOME/.kodi/userdata/addon_data/pvr.hts ]; then
+  if [ -d /usr/share/kodi/config/pvr.hts ]; then
+    mkdir -p $HOME/.kodi/userdata/addon_data
+    cp -R /usr/share/kodi/config/pvr.hts $HOME/.kodi/userdata/addon_data
+  fi
+fi
+
+if [ ! -d $HOME/.kodi/userdata/addon_data/service.system.settings ]; then
+  if [ -d /usr/share/kodi/config/service.system.settings ]; then
+    mkdir -p $HOME/.kodi/userdata/addon_data
+    cp -R /usr/share/kodi/config/service.system.settings $HOME/.kodi/userdata/addon_data
+  fi
+fi
+
+# add default config file to HOME dir Kodi
+if [ ! -f $HOME/.kodi/userdata/advancedsettings.xml.sample ] ; then
+  if [ -f /usr/share/kodi/system/advancedsettings.xml.sample ]; then
+    cp /usr/share/kodi/system/advancedsettings.xml.sample $HOME/.kodi/userdata
+  fi
+fi
+
+if [ ! -f $HOME/.kodi/userdata/keymaps/keyboard.xml ] ; then
+  mkdir -p $HOME/.kodi/userdata/keymaps
+  cp /usr/share/kodi/system/keymaps/keyboard.xml $HOME/.kodi/userdata/keymaps
+fi
+
+# set AV-output (cvbs)
+if [ ! -f $HOME/.kodi/userdata/cvbs_present ] ; then
+  touch $HOME/.kodi/userdata/cvbs_present
+  if [ -f /usr/share/kodi/config/cvbs_fallback ]; then
+    cp -f /usr/share/kodi/config/cvbs_fallback $HOME/.kodi/userdata
+  fi
+fi
+
+KODI_ARGS="--lircdev /run/lirc/lircd"
+
+echo "KODI_ARGS=\"$KODI_ARGS\"" > /run/alexelec/kodi.conf

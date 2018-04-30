@@ -1,0 +1,17 @@
+diff -Naurp oscam-d3b3898/config.sh oscam-d3b3898-patch/config.sh
+--- oscam-d3b3898/config.sh	2018-01-11 18:00:25.000000000 +0200
++++ oscam-d3b3898-patch/config.sh	2018-01-11 18:03:18.000000000 +0200
+@@ -694,12 +694,7 @@ do
+ 		break
+ 	;;
+ 	'-r'|'--oscam-revision')
+-		revision=`(svnversion -n . 2>/dev/null || printf 0) | sed 's/.*://; s/[^0-9]*$//; s/^$/0/'`
+-		if [ "$revision" = "0" ] 
+-		then
+-			which git > /dev/null 2>&1 && revision=`git log -1 --pretty=%B | grep git-svn-id | sed -n -e 's/^.*trunk@\([0-9]*\) .*$/\1/p'`
+-		fi
+-		echo $revision
++		echo "$OSCAM_VERSION_NUMBER"
+ 		break
+ 	;;
+ 	'-O'|'--detect-osx-sdk-version')

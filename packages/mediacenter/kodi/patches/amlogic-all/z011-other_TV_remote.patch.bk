@@ -1,0 +1,27 @@
+diff -Naurp kodi-17.4-rc1-900ad00/system/keymaps/keyboard.xml kodi-17.4-rc1-900ad00-patch/system/keymaps/keyboard.xml
+--- kodi-17.4-rc1-900ad00/system/keymaps/keyboard.xml	2017-08-01 11:09:06.000000000 +0300
++++ kodi-17.4-rc1-900ad00-patch/system/keymaps/keyboard.xml	2017-08-01 12:22:17.000000000 +0300
+@@ -641,16 +641,17 @@
+   </NumericInput>
+   <FullscreenLiveTV>
+     <keyboard>
+-      <left>ActivateWindow(PVROSDChannels)</left>
+-      <right>ActivateWindow(PVROSDGuide)</right>
++      <left>VolumeDown</left>
++      <right>VolumeUp</right>
+       <up>Up</up>
+       <down>Down</down>
+-      <return>OSD</return>
+-      <enter>OSD</enter>
+-      <return mod="longpress">ActivateWindow(PVROSDChannels)</return>
+-      <enter mod="longpress">ActivateWindow(PVROSDChannels)</enter>
++      <return>ActivateWindow(PVROSDChannels)</return>
++      <enter>ActivateWindow(PVROSDChannels)</enter>
++      <return mod="longpress">ActivateWindow(PVROSDGuide)</return>
++      <enter mod="longpress">ActivateWindow(PVROSDGuide)</enter>
+       <pageup>ChannelUp</pageup>
+       <pagedown>ChannelDown</pagedown>
++      <c>OSD</c>
+     </keyboard>
+   </FullscreenLiveTV>
+   <FullscreenRadio>

@@ -1,0 +1,15 @@
+#!/bin/sh
+################################################################################
+#      This file is part of Alex@ELEC - http://www.alexelec.in.ua
+#      Copyright (C) 2011-2017 Alexandr Zuyev (alex@alexelec.in.ua)
+################################################################################
+
+. /storage/.cache/alexelec/network_wait
+
+[ -z $WAIT_NETWORK_TIME ] && WAIT_NETWORK_TIME="20"
+
+logger -t network "starting wait: $WAIT_NETWORK_TIME sec"
+/usr/sbin/connmand-wait-online --timeout=$WAIT_NETWORK_TIME
+RET=$?
+logger -t network "stoping wait: $WAIT_NETWORK_TIME sec - exit code: $RET"
+exit $RET

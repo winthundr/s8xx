@@ -1,0 +1,19 @@
+--- live/pages/timers.ecpp
++++ live/pages/timers.ecpp
+@@ -35,6 +35,7 @@
+ 	pageTitle = trVDR("Timers");
+ 
+ 	cMutexLock timersLock( &LiveTimerManager() );
++	LiveTimerManager().DoReloadTimers();
+ 	SortedTimers& timers = LiveTimerManager().GetTimers();
+ 
+ 	timer = 0;
+@@ -81,7 +82,7 @@
+ <%cpp>
+ 				// output of the timer list:
+ 				for (SortedTimers::iterator timer = timers.begin(); timer != timers.end(); ++timer) {
+-				    EpgInfoPtr epgEvent;
++					EpgInfoPtr epgEvent;
+ 					string longDescription;
+ 					if (!timer->Event()) timer->SetEventFromSchedule();
+ 					if (timer->Event())

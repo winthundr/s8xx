@@ -1,0 +1,12 @@
+diff -Naurp vdr-plugin-dvbapi-8395491/DVBAPISetup.cpp vdr-plugin-dvbapi-8395491-patch/DVBAPISetup.cpp
+--- vdr-plugin-dvbapi-8395491/DVBAPISetup.cpp	2017-04-17 10:56:37.000000000 +0300
++++ vdr-plugin-dvbapi-8395491-patch/DVBAPISetup.cpp	2017-07-15 13:16:45.000000000 +0300
+@@ -20,7 +20,7 @@
+ 
+ int LogLevel = 2;
+ char OSCamHost[HOST_NAME_MAX] = "localhost";
+-int OSCamPort = 2000;
++int OSCamPort = 9000;
+ 
+ cMenuSetupDVBAPI::cMenuSetupDVBAPI(void)
+ {

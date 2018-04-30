@@ -1,0 +1,43 @@
+#!/bin/sh
+################################################################################
+#      This file is part of Alex@ELEC - http://www.alexelec.in.ua
+#      Copyright (C) 2011-2017 Alexandr Zuyev (alex@alexelec.in.ua)
+################################################################################
+
+export PLEX_MEDIA_SERVER_HOME="/storage/.config/Plex.app"
+export PLEX_MEDIA_SERVER_APPLICATION_SUPPORT_DIR="/storage/.config"
+export PLEX_MEDIA_SERVER_TMPDIR="$PLEX_MEDIA_SERVER_HOME/tmp"
+
+install_plex() {
+  kodi-send -a "Notification(Plex, wait for install..., 30000)"
+  mkdir -p $PLEX_MEDIA_SERVER_TMPDIR
+  cd $PLEX_MEDIA_SERVER_TMPDIR
+  wget -q https://downloads.plex.tv/plex-media-server/$1/PlexMediaServer-$1-arm7.spk || exit 1
+  tar -xf PlexMediaServer-$1-arm7.spk
+  tar -zxf package.tgz -C $PLEX_MEDIA_SERVER_HOME
+  cd /storage
+}
+
+if [ -f "$PLEX_MEDIA_SERVER_HOME/plex.conf" ]; then
+  . $PLEX_MEDIA_SERVER_HOME/plex.conf
+else
+  . /usr/share/plex/plex.conf
+  mkdir -p $PLEX_MEDIA_SERVER_HOME
+  rm -rf $PLEX_MEDIA_SERVER_HOME/*
+  export `wget -q -O - "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=plex-media-server" | grep -E '^pkgver='` || exit 1
+  export `wget -q -O - "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=plex-media-server" | grep -E '^_pkgsum='` || exit 1
+  install_plex $pkgver-$_pkgsum > /tmp/runplex.log 2>&1
+  cp /usr/share/plex/plex.conf $PLEX_MEDIA_SERVER_HOME/plex.conf
+  # fix Transcoder
+  MAIN_JS=$(find $PLEX_MEDIA_SERVER_HOME/Resources -name main*.js)
+  if [ -n "$MAIN_JS" ]; then
+    sed -i s'/validateTranscoder:function([a-zA-Z],[a-zA-Z]){/&return false;/' $MAIN_JS
+  fi
+  kodi-send -a "Notification(Plex, installation completed. Starting..., 5000)"
+fi
+
+rm -rf $PLEX_MEDIA_SERVER_TMPDIR
+mkdir -p $PLEX_MEDIA_SERVER_TMPDIR
+
+export LD_LIBRARY_PATH=$PLEX_MEDIA_SERVER_HOME
+$PLEX_MEDIA_SERVER_HOME/Plex\ Media\ Server

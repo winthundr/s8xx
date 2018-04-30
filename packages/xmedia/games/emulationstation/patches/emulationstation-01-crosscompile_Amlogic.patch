@@ -1,0 +1,15 @@
+diff -Naurp emulationstation-268e6c8/CMakeLists.txt emulationstation-268e6c8-patch/CMakeLists.txt
+--- emulationstation-268e6c8/CMakeLists.txt	2017-05-11 19:00:16.000000000 +0300
++++ emulationstation-268e6c8-patch/CMakeLists.txt	2017-05-11 19:06:20.000000000 +0300
+@@ -28,10 +28,7 @@ endif()
+ #-------------------------------------------------------------------------------
+ #check if we're running on olinuxino / odroid / etc
+ MESSAGE("Looking for libMali.so")
+-if(EXISTS "/usr/lib/libMali.so" OR
+-   EXISTS "/usr/lib/arm-linux-gnueabihf/libMali.so" OR
+-   EXISTS "/usr/lib/aarch64-linux-gnu/libMali.so" OR
+-   EXISTS "/usr/lib/arm-linux-gnueabihf/mali-egl/libmali.so")
++if(EXISTS "${CMAKE_FIND_ROOT_PATH}/usr/lib/libMali.so")
+     MESSAGE("libMali.so found")
+     set(GLSystem "OpenGL ES")
+ else()

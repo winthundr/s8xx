@@ -1,0 +1,399 @@
+diff -Naurp vdr-2.3.8/config.c vdr-2.3.8-patch/config.c
+--- vdr-2.3.8/config.c	2017-05-21 13:25:26.000000000 +0300
++++ vdr-2.3.8-patch/config.c	2017-07-04 20:04:29.000000000 +0300
+@@ -395,6 +395,9 @@ cSetup::cSetup(void)
+   PositionerSpeed = 15;
+   PositionerSwing = 650;
+   PositionerLastLon = 0;
++  PowerdownEnabled = 1;
++  PowerdownTimeoutS = 15;
++  PowerdownWakeupH = 4;
+   SetSystemTime = 0;
+   TimeSource = 0;
+   TimeTransponder = 0;
+@@ -622,6 +625,9 @@ bool cSetup::Parse(const char *Name, con
+   else if (!strcasecmp(Name, "PositionerSpeed"))     PositionerSpeed    = atoi(Value);
+   else if (!strcasecmp(Name, "PositionerSwing"))     PositionerSwing    = atoi(Value);
+   else if (!strcasecmp(Name, "PositionerLastLon"))   PositionerLastLon  = atoi(Value);
++  else if (!strcasecmp(Name, "PowerdownEnabled"))    PowerdownEnabled   = atoi(Value);
++  else if (!strcasecmp(Name, "PowerdownTimeoutS"))   PowerdownTimeoutS  = atoi(Value);
++  else if (!strcasecmp(Name, "PowerdownWakeupH"))    PowerdownWakeupH   = atoi(Value);
+   else if (!strcasecmp(Name, "SetSystemTime"))       SetSystemTime      = atoi(Value);
+   else if (!strcasecmp(Name, "TimeSource"))          TimeSource         = cSource::FromString(Value);
+   else if (!strcasecmp(Name, "TimeTransponder"))     TimeTransponder    = atoi(Value);
+@@ -753,6 +759,9 @@ bool cSetup::Save(void)
+   Store("PositionerSpeed",    PositionerSpeed);
+   Store("PositionerSwing",    PositionerSwing);
+   Store("PositionerLastLon",  PositionerLastLon);
++  Store("PowerdownEnabled",   PowerdownEnabled);
++  Store("PowerdownTimeoutS",  PowerdownTimeoutS);
++  Store("PowerdownWakeupH",   PowerdownWakeupH);
+   Store("SetSystemTime",      SetSystemTime);
+   Store("TimeSource",         cSource::ToString(TimeSource));
+   Store("TimeTransponder",    TimeTransponder);
+diff -Naurp vdr-2.3.8/config.h vdr-2.3.8-patch/config.h
+--- vdr-2.3.8/config.h	2017-06-12 11:58:26.000000000 +0300
++++ vdr-2.3.8-patch/config.h	2017-07-04 20:04:29.000000000 +0300
+@@ -273,6 +273,9 @@ public:
+   int PositionerSpeed;
+   int PositionerSwing;
+   int PositionerLastLon;
++  int PowerdownEnabled;
++  int PowerdownTimeoutS;
++  int PowerdownWakeupH;
+   int SetSystemTime;
+   int TimeSource;
+   int TimeTransponder;
+diff -Naurp vdr-2.3.8/device.c vdr-2.3.8-patch/device.c
+--- vdr-2.3.8/device.c	2017-07-04 20:01:20.000000000 +0300
++++ vdr-2.3.8-patch/device.c	2017-07-04 20:04:29.000000000 +0300
+@@ -107,6 +107,9 @@ cDevice::cDevice(void)
+   dvbSubtitleConverter = NULL;
+   autoSelectPreferredSubtitleLanguage = true;
+ 
++  idleTimerExpires = time(NULL) + Setup.PowerdownTimeoutS;
++  wakeupTimerExpires = 0;
++
+   for (int i = 0; i < MAXRECEIVERS; i++)
+       receiver[i] = NULL;
+ 
+@@ -835,6 +838,10 @@ bool cDevice::SwitchChannel(int Directio
+      }
+   return result;
+ }
++// While switching to a channel, the device will be kept powered up
++// for at least this number of seconds before a receiver is attached.
++// Must be less than cEITScanner::ScanTimeout.
++#define CHANNEL_SWITCH_POWERUP_TIMEOUT  10
+ 
+ eSetChannelResult cDevice::SetChannel(const cChannel *Channel, bool LiveView)
+ {
+@@ -870,6 +877,7 @@ eSetChannelResult cDevice::SetChannel(co
+         Result = scrNotAvailable;
+      }
+   else {
++	PowerUp(CHANNEL_SWITCH_POWERUP_TIMEOUT);
+      // Stop section handling:
+      if (sectionHandler) {
+         sectionHandler->SetStatus(false);
+@@ -935,8 +943,11 @@ int cDevice::Occupied(void) const
+ 
+ void cDevice::SetOccupied(int Seconds)
+ {
+-  if (Seconds >= 0)
++  if (Seconds >= 0) {
+      occupiedTimeout = time(NULL) + min(Seconds, MAXOCCUPIEDTIMEOUT);
++     // avoid short power-down/power-up cycles
++     SetIdleTimer(true, Seconds + 30);
++     }
+ }
+ 
+ bool cDevice::SetChannelDevice(const cChannel *Channel, bool LiveView)
+@@ -1793,6 +1804,7 @@ bool cDevice::AttachReceiver(cReceiver *
+                }
+             }
+          Start();
++	  SetIdleTimer(false);
+          return true;
+          }
+       }
+@@ -1826,8 +1838,10 @@ void cDevice::Detach(cReceiver *Receiver
+            camSlot->Assign(NULL);
+         }
+      }
+-  if (!receiversLeft)
++  if (!receiversLeft) {
+      Cancel(-1);
++     SetIdleTimer(true);
++  }
+ }
+ 
+ void cDevice::DetachAll(int Pid)
+@@ -1891,6 +1905,81 @@ void cTSBuffer::Action(void)
+            }
+      }
+ }
++void cDevice::CheckIdle(void)
++{
++  if (!SupportsPowerDown() || !Setup.PowerdownEnabled)
++     return;
++  cMutexLock MutexLock(&mutexPowerSaving);
++  if (idleTimerExpires != 0 && time(NULL) > idleTimerExpires) {
++     // idle, powered up
++     dsyslog("power saving: device %d idle timer expired", CardIndex() + 1);
++     SetIdleTimer(false);
++     if (Setup.PowerdownWakeupH != 0)
++        wakeupTimerExpires = time(NULL) + Setup.PowerdownWakeupH * 3600;
++     else
++        dsyslog("power saving: waking up is disabled");
++     if (!IsPoweredDown()) {
++        dsyslog("power saving: powering device %d down", CardIndex() + 1);
++        if (sectionHandler) {
++           sectionHandler->SetStatus(false);
++           sectionHandler->SetChannel(NULL);
++           }
++        PowerDown(true);
++        }
++     }
++  if (wakeupTimerExpires != 0 && time(NULL) > wakeupTimerExpires) {
++     // idle, powered down
++     dsyslog("power saving: device %d wakeup timer expired", CardIndex() + 1);
++     SetIdleTimer(true);
++     if (IsPoweredDown()) {
++        dsyslog("power saving: waking up device %d", CardIndex() + 1);
++        PowerDown(false);
++        }
++     }
++}
++
++void cDevice::SetIdleTimer(bool On, int ExtraTimeoutS)
++{
++  if (!SupportsPowerDown())
++     return;
++  cMutexLock MutexLock(&mutexPowerSaving);
++  if (On) {
++     int Tout = Setup.PowerdownTimeoutS;
++     time_t Now = time(NULL);
++     if (ExtraTimeoutS > 0) {
++        if (idleTimerExpires >= Now + ExtraTimeoutS)
++           return;
++        Tout = ExtraTimeoutS;
++        }
++     idleTimerExpires = Now + Tout;
++     if (Setup.PowerdownEnabled)
++        dsyslog("power saving: set device %d idle timer to %d sec", CardIndex() + 1, Tout);
++     }
++  else {
++     idleTimerExpires = 0;
++     if (Setup.PowerdownEnabled)
++        dsyslog("power saving: disable device %d idle timer", CardIndex() + 1);
++     }
++  wakeupTimerExpires = 0;
++}
++
++bool cDevice::PoweredDown(void)
++{
++  if (SupportsPowerDown() && Setup.PowerdownEnabled) {
++     cMutexLock MutexLock(&mutexPowerSaving);
++     return IsPoweredDown();
++     }
++  else
++     return false;
++}
++
++void cDevice::PowerUp(int ExtraTimeoutS)
++{
++  cMutexLock MutexLock(&mutexPowerSaving);
++  SetIdleTimer(true, ExtraTimeoutS);
++  if (SupportsPowerDown() && IsPoweredDown())
++     PowerDown(false);
++}
+ 
+ uchar *cTSBuffer::Get(int *Available, bool CheckAvailable)
+ {
+diff -Naurp vdr-2.3.8/device.h vdr-2.3.8-patch/device.h
+--- vdr-2.3.8/device.h	2017-07-04 20:01:17.000000000 +0300
++++ vdr-2.3.8-patch/device.h	2017-07-04 20:04:29.000000000 +0300
+@@ -863,6 +863,35 @@ public:
+        ///< Detaches all receivers from this device for this pid.
+   virtual void DetachAllReceivers(void);
+        ///< Detaches all receivers from this device.
++
++// Power saving facilities
++
++private:
++  cMutex mutexPowerSaving;
++  time_t idleTimerExpires, wakeupTimerExpires;
++  void PowerUp(int ExtraTimeoutS);
++       ///< If the device is powered down, powers it up and keeps it
++       ///< powered up for at least ExtraTimeoutS seconds (see
++       ///< cDevice::SetIdleTimer()).
++public:
++  void CheckIdle(void);
++       ///< Should be called periodically in the main loop.
++  bool PoweredDown(void);
++       ///< Returns true if the device is powered down "logically", that is,
++       ///< idle tasks like EPG scanning are disabled.
++  void SetIdleTimer(bool On, int ExtraTimeoutS = 0);
++       ///< Starts/disables the idle timer. This timer must be started when
++       ///< a device gets idle and must be disabled when it is receiving.
++       ///< If ExtraTimeoutS is greater than zero and On is true, a new timer
++       ///< won't be set, but the device will be kept powered up for at least
++       ///< ExtraTimeoutS seconds.
++protected:
++  virtual bool IsPoweredDown(void) {return false;}
++       ///< Returns true if the device is powered down "physically".
++  virtual void PowerDown(bool On) {};
++       ///< Actually powers the device down/up.
++  virtual bool SupportsPowerDown() {return false;}
++       ///< Returns true if a derived device supports power saving.
+   };
+ 
+ /// Derived cDevice classes that can receive channels will have to provide
+diff -Naurp vdr-2.3.8/dvbdevice.c vdr-2.3.8-patch/dvbdevice.c
+--- vdr-2.3.8/dvbdevice.c	2017-05-09 14:50:38.000000000 +0300
++++ vdr-2.3.8-patch/dvbdevice.c	2017-07-04 20:04:29.000000000 +0300
+@@ -352,6 +352,8 @@ public:
+   bool GetSignalStats(int &Valid, double *Strength = NULL, double *Cnr = NULL, double *BerPre = NULL, double *BerPost = NULL, double *Per = NULL, int *Status = NULL) const;
+   int GetSignalStrength(void) const;
+   int GetSignalQuality(void) const;
++  bool IsPoweredDown(void) {return fd_frontend < 0;}
++  void PowerDown(bool On);
+   };
+ 
+ cMutex cDvbTuner::bondMutex;
+@@ -551,6 +553,8 @@ void cDvbTuner::ClearEventQueue(void) co
+ 
+ bool cDvbTuner::GetFrontendStatus(fe_status_t &Status) const
+ {
++  if (fd_frontend < 0)
++     return false;
+   ClearEventQueue();
+   while (1) {
+         if (ioctl(fd_frontend, FE_READ_STATUS, &Status) != -1)
+@@ -576,6 +580,8 @@ bool cDvbTuner::GetFrontendStatus(fe_sta
+ 
+ bool cDvbTuner::GetSignalStats(int &Valid, double *Strength, double *Cnr, double *BerPre, double *BerPost, double *Per, int *Status) const
+ {
++  if (fd_frontend < 0)
++     return -1;
+   ClearEventQueue();
+   fe_status_t FeStatus;
+   dtv_property Props[MAXFRONTENDCMDS];
+@@ -1225,6 +1231,26 @@ void cDvbTuner::Action(void)
+         }
+ }
+ 
++void cDvbTuner::PowerDown(bool On)
++{
++  cMutexLock MutexLock(&mutex);
++  if (On && fd_frontend >= 0) {
++     isyslog("dvb tuner: power-down - closing frontend %d/%d", adapter, frontend);
++     tunerStatus = tsIdle;
++     close(fd_frontend);
++     fd_frontend = -1;
++     }
++  if (!On && fd_frontend < 0) {
++     cString Filename = cString::sprintf("%s/%s%d/%s%d",
++        DEV_DVB_BASE, DEV_DVB_ADAPTER, adapter, DEV_DVB_FRONTEND, frontend);
++     isyslog("dvb tuner: power-up - opening frontend %d/%d", adapter, frontend);
++     fd_frontend = open(Filename, O_RDWR | O_NONBLOCK);
++     if (fd_frontend < 0)
++        esyslog("ERROR: can't open DVB device frontend %d/%d", adapter, frontend);
++     tunerStatus = tsIdle;
++     }
++}
++
+ // --- cDvbSourceParam -------------------------------------------------------
+ 
+ class cDvbSourceParam : public cSourceParam {
+@@ -1954,6 +1980,19 @@ void cDvbDevice::DetachAllReceivers(void
+   needsDetachBondedReceivers = false;
+ }
+ 
++bool cDvbDevice::IsPoweredDown(void)
++{
++  if (dvbTuner)
++     return dvbTuner->IsPoweredDown();
++  return false;
++}
++
++void cDvbDevice::PowerDown(bool On)
++{
++  if (dvbTuner)
++     dvbTuner->PowerDown(On);
++}
++
+ // --- cDvbDeviceProbe -------------------------------------------------------
+ 
+ cList<cDvbDeviceProbe> DvbDeviceProbes;
+diff -Naurp vdr-2.3.8/dvbdevice.h vdr-2.3.8-patch/dvbdevice.h
+--- vdr-2.3.8/dvbdevice.h	2017-05-09 14:24:47.000000000 +0300
++++ vdr-2.3.8-patch/dvbdevice.h	2017-07-04 20:04:29.000000000 +0300
+@@ -292,6 +292,13 @@ protected:
+   virtual void CloseDvr(void);
+   virtual bool GetTSPacket(uchar *&Data);
+   virtual void DetachAllReceivers(void);
++
++// Power saving facilities
++
++protected:
++  virtual bool IsPoweredDown(void);
++  virtual void PowerDown(bool On);
++  virtual bool SupportsPowerDown() {return true;}
+   };
+ 
+ // A plugin that implements a DVB device derived from cDvbDevice needs to create
+diff -Naurp vdr-2.3.8/eitscan.c vdr-2.3.8-patch/eitscan.c
+--- vdr-2.3.8/eitscan.c	2015-09-10 14:05:03.000000000 +0300
++++ vdr-2.3.8-patch/eitscan.c	2017-07-04 20:04:29.000000000 +0300
+@@ -144,7 +144,8 @@ void cEITScanner::Process(void)
+            bool AnyDeviceSwitched = false;
+            for (int i = 0; i < cDevice::NumDevices(); i++) {
+                cDevice *Device = cDevice::GetDevice(i);
+-               if (Device && Device->ProvidesEIT()) {
++               if (Device && Device->ProvidesEIT()
++                     && (!Device->PoweredDown() || lastActivity == 0)) { // powered up or forced scan
+                   for (cScanData *ScanData = scanList->First(); ScanData; ScanData = scanList->Next(ScanData)) {
+                       const cChannel *Channel = ScanData->GetChannel();
+                       if (Channel) {
+@@ -165,6 +166,10 @@ void cEITScanner::Process(void)
+                                            }
+                                         }
+                                      //dsyslog("EIT scan: device %d  source  %-8s tp %5d", Device->DeviceNumber() + 1, *cSource::ToString(Channel->Source()), Channel->Transponder());
++                                     if (lastActivity == 0)
++                                        // forced scan - set idle timer for each channel switch;
++                                        // this prevents powering down while scanning a transponder
++                                        Device->SetIdleTimer(true, ScanTimeout + 5);
+                                      Device->SwitchChannel(Channel, false);
+                                      scanList->Del(ScanData);
+                                      AnyDeviceSwitched = true;
+diff -Naurp vdr-2.3.8/menu.c vdr-2.3.8-patch/menu.c
+--- vdr-2.3.8/menu.c	2017-06-30 12:49:39.000000000 +0300
++++ vdr-2.3.8-patch/menu.c	2017-07-04 20:04:29.000000000 +0300
+@@ -3718,6 +3718,12 @@ void cMenuSetupLNB::Setup(void)
+      Add(new cMenuEditIntxItem(tr("Setup.LNB$Positioner speed (degrees/s)"), &data.PositionerSpeed, 1, 1800, 10));
+      }
+ 
++  Add(new cMenuEditBoolItem(tr("Setup.LNB$Enable power saving"), &data.PowerdownEnabled));
++  if (data.PowerdownEnabled) {
++     Add(new cMenuEditIntItem(tr("Setup.LNB$Power down an idle device after (sec)"), &data.PowerdownTimeoutS));
++     Add(new cMenuEditIntItem(tr("Setup.LNB$Wake up from power-down after (h)"), &data.PowerdownWakeupH));
++     }
++
+   SetCurrent(Get(current));
+   Display();
+ }
+@@ -3726,6 +3732,7 @@ eOSState cMenuSetupLNB::ProcessKey(eKeys
+ {
+   int oldDiSEqC = data.DiSEqC;
+   int oldUsePositioner = data.UsePositioner;
++  int oldPowerdownEnabled = data.PowerdownEnabled;
+   bool DeviceBondingsChanged = false;
+   if (Key == kOk) {
+      cString NewDeviceBondings = satCableNumbers.ToString();
+@@ -3734,7 +3741,7 @@ eOSState cMenuSetupLNB::ProcessKey(eKeys
+      }
+   eOSState state = cMenuSetupBase::ProcessKey(Key);
+ 
+-  if (Key != kNone && (data.DiSEqC != oldDiSEqC || data.UsePositioner != oldUsePositioner))
++  if (Key != kNone && (data.DiSEqC != oldDiSEqC || data.UsePositioner != oldUsePositioner || data.PowerdownEnabled != oldPowerdownEnabled))
+      Setup();
+   else if (DeviceBondingsChanged)
+      cDvbDevice::BondDevices(data.DeviceBondings);
+diff -Naurp vdr-2.3.8/vdr.c vdr-2.3.8-patch/vdr.c
+--- vdr-2.3.8/vdr.c	2017-07-04 20:02:24.000000000 +0300
++++ vdr-2.3.8-patch/vdr.c	2017-07-04 20:04:29.000000000 +0300
+@@ -1548,6 +1548,12 @@ int main(int argc, char *argv[])
+ 
+         ReportEpgBugFixStats();
+ 
++        for (int i = 0; i < cDevice::NumDevices(); i++) {
++           cDevice *d = cDevice::GetDevice(i);
++           if (d)
++              d->CheckIdle();
++           }
++
+         // Main thread hooks of plugins:
+         PluginManager.MainThreadHook();
+         }

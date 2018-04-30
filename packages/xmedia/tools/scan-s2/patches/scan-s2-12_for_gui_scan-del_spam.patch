@@ -1,0 +1,12 @@
+diff -Naurp scan-s2-46/scan.c scan-s2-46-patch/scan.c
+--- scan-s2-46/scan.c	2017-07-24 18:59:57.000000000 +0300
++++ scan-s2-46-patch/scan.c	2017-07-24 19:05:32.000000000 +0300
+@@ -1847,7 +1847,7 @@ static int start_filter (struct section_
+ 	f.flags = DMX_IMMEDIATE_START | DMX_CHECK_CRC;
+ 
+ 	if (ioctl(s->fd, DMX_SET_FILTER, &f) == -1) {
+-		errorn ("ioctl DMX_SET_FILTER failed");
++		if (!noinfo) errorn ("ioctl DMX_SET_FILTER failed");
+ 		goto err1;
+ 	}
+ 

@@ -1,0 +1,16 @@
+[Unit]
+Description=Oscam Daemon
+After=network-online.target
+Before=kodi.service tvip.service
+Wants=network-online.target
+ConditionPathExists=/storage/.cache/services/oscam.conf
+
+[Service]
+ExecStart=/bin/sh -c 'exec /usr/bin/oscam.start'
+TimeoutStopSec=1
+Restart=always
+RestartSec=2
+StartLimitInterval=0
+
+[Install]
+WantedBy=multi-user.target

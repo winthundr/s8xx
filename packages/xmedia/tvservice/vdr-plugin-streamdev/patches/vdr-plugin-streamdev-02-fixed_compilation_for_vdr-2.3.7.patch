@@ -1,0 +1,36 @@
+From ce74c3ab559d579c37ad8ac29ddfc188d2f3ba26 Mon Sep 17 00:00:00 2001
+From: Jasmin Jessich <jasmin@anw.at>
+Date: Sun, 11 Jun 2017 21:01:01 +0200
+Subject: [PATCH] Fixed compilation for vdr 2.3.7
+
+---
+ server/connectionVTP.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/server/connectionVTP.c b/server/connectionVTP.c
+index 1b8dd96..346ca45 100644
+--- a/server/connectionVTP.c
++++ b/server/connectionVTP.c
+@@ -41,7 +41,9 @@ private:
+ 	enum eStates { Channel, Event, Title, Subtitle, Description, Vps, Content, Rating,
+ 	               EndEvent, EndChannel, EndEPG };
+ 	cConnectionVTP    *m_Client;
++#if APIVERSNUM < 20300
+ 	cSchedulesLock    *m_SchedulesLock;
++#endif
+ 	const cSchedules  *m_Schedules;
+ 	const cSchedule   *m_Schedule;
+ 	const cEvent      *m_Event;
+@@ -210,7 +212,9 @@ cLSTEHandler::cLSTEHandler(cConnectionVTP *Client, const char *Option):
+ 
+ cLSTEHandler::~cLSTEHandler()
+ {
++#if APIVERSNUM < 20300
+ 	delete m_SchedulesLock;
++#endif
+ }
+ 
+ bool cLSTEHandler::Next(bool &Last)
+-- 
+2.7.4
+

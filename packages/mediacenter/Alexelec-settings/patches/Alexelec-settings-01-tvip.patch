@@ -1,0 +1,137 @@
+diff -Naurp Alexelec-settings-10b322b/language/English/strings.po Alexelec-settings-10b322b-patch/language/English/strings.po
+--- Alexelec-settings-10b322b/language/English/strings.po	2017-10-04 20:12:57.000000000 +0300
++++ Alexelec-settings-10b322b-patch/language/English/strings.po	2017-10-24 15:45:20.000000000 +0300
+@@ -1104,6 +1104,20 @@ msgctxt "#2842"
+ msgid "Apply the current display resolution."
+ msgstr ""
+ 
++########## SHELL #########
++
++msgctxt "#32850"
++msgid "Shell"
++msgstr ""
++
++msgctxt "#32851"
++msgid "Media Shell:"
++msgstr ""
++
++msgctxt "#2851"
++msgid "Select the shell loaded at startup."
++msgstr ""
++
+ ########## ACESTREAM #########
+ 
+ msgctxt "#34000"
+diff -Naurp Alexelec-settings-10b322b/language/Russian/strings.po Alexelec-settings-10b322b-patch/language/Russian/strings.po
+--- Alexelec-settings-10b322b/language/Russian/strings.po	2017-10-04 20:12:57.000000000 +0300
++++ Alexelec-settings-10b322b-patch/language/Russian/strings.po	2017-10-24 15:47:13.000000000 +0300
+@@ -1024,6 +1024,20 @@ msgctxt "#2842"
+ msgid "Apply the current display resolution."
+ msgstr "Применить выбранное разрешение. [B]none[/B] - сброс настроек."
+ 
++########## SHELL #########
++
++msgctxt "#32850"
++msgid "Shell"
++msgstr "Оболочка"
++
++msgctxt "#32851"
++msgid "Media Shell:"
++msgstr "Медиа оболочка:"
++
++msgctxt "#2851"
++msgid "Select the shell loaded at startup."
++msgstr "Выберите оболочку загружаемую при старте системы."
++
+ ########## ACESTREAM #########
+ 
+ msgctxt "#34000"
+diff -Naurp Alexelec-settings-10b322b/src/defaults.py Alexelec-settings-10b322b-patch/src/defaults.py
+--- Alexelec-settings-10b322b/src/defaults.py	2017-10-04 20:12:57.000000000 +0300
++++ Alexelec-settings-10b322b-patch/src/defaults.py	2017-10-24 15:37:41.000000000 +0300
+@@ -59,6 +59,8 @@ services = {
+     # DISPLAY RESOLUTION
+     'D_DISP_RES'        : 'none',
+     'RUN_DISPCAP'       : "%s/dispcap.sh" % SCRIPT_DIR,
++    # SHELL
++    'D_SHELL'           : 'KODI',
+     }
+ 
+ ################################################################################
+diff -Naurp Alexelec-settings-10b322b/src/resources/lib/modules/services.py Alexelec-settings-10b322b-patch/src/resources/lib/modules/services.py
+--- Alexelec-settings-10b322b/src/resources/lib/modules/services.py	2017-10-04 20:12:57.000000000 +0300
++++ Alexelec-settings-10b322b-patch/src/resources/lib/modules/services.py	2017-10-24 15:41:04.000000000 +0300
+@@ -44,6 +44,8 @@ class services:
+     D_DISP_RES = None
+     RUN_DISPCAP = None
+ 
++    D_SHELL = None
++
+     menu = {'1': {
+         'name': 32001,
+         'menuLoader': 'load_menu',
+@@ -419,6 +421,22 @@ class services:
+                             },
+                         },
+                     },
++                'shell': {
++                    'order': 14,
++                    'name': 32850,
++                    'not_supported': [],
++                    'settings': {
++                        'first_shell': {
++                            'order': 1,
++                            'name': 32851,
++                            'value': 'KODI',
++                            'values': ['KODI', 'TVIP'],
++                            'action': 'initialize_shell',
++                            'type': 'multivalue',
++                            'InfoText': 2851,
++                            },
++                        },
++                    },
+                 }
+ 
+             self.oe = oeMain
+@@ -441,6 +459,7 @@ class services:
+             self.initialize_plex()
+             self.initialize_nand()
+             self.initialize_dispcap()
++            self.initialize_shell()
+             self.oe.dbg_log('services::start_service', 'exit_function', 0)
+         except Exception, e:
+             self.oe.dbg_log('services::start_service', 'ERROR: (%s)' % repr(e))
+@@ -566,6 +585,10 @@ class services:
+             self.struct['dispcap']['settings']['disp_res']['value'] = \
+             self.oe.get_service_option('dispcap', 'DISP_RES', self.D_DISP_RES).replace('"', '')
+ 
++            # shell
++            self.struct['shell']['settings']['first_shell']['value'] = \
++            self.oe.get_service_option('shell', 'SHELL', self.D_SHELL).replace('"', '')
++
+             self.oe.dbg_log('services::load_values', 'exit_function', 0)
+         except Exception, e:
+             self.oe.dbg_log('services::load_values', 'ERROR: (%s)' % repr(e))
+@@ -876,6 +899,22 @@ class services:
+             self.oe.set_busy(0)
+             self.oe.dbg_log('services::initialize_dispcap', 'ERROR: (%s)' % repr(e), 4)
+ 
++    def initialize_shell(self, **kwargs):
++        try:
++            self.oe.dbg_log('services::initialize_shell', 'enter_function', 0)
++            self.oe.set_busy(1)
++            if 'listItem' in kwargs:
++                self.set_value(kwargs['listItem'])
++            options = {}
++            state = 1
++            options['SHELL'] = '"%s"' % self.struct['shell']['settings']['first_shell']['value']
++            self.oe.set_service('shell', options, state)   
++            self.oe.set_busy(0)
++            self.oe.dbg_log('services::initialize_shell', 'exit_function', 0)
++        except Exception, e:
++            self.oe.set_busy(0)
++            self.oe.dbg_log('services::initialize_shell', 'ERROR: (%s)' % repr(e), 4)
++
+     def execute_dispcap(self, listItem=None):
+         try:
+             self.oe.dbg_log('services::execute_dispcap', 'enter_function', 0)

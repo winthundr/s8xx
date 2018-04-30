@@ -1,0 +1,19 @@
+#!/bin/sh
+################################################################################
+#      This file is part of Alex@ELEC - http://www.alexelec.in.ua
+#      Copyright (C) 2011-present Alexandr Zuyev (alex@alexelec.in.ua)
+################################################################################
+
+LOCK_DIR="/var/lock"
+SERVICE_DIR="/storage/.cache/services"
+
+if [ -f "$SERVICE_DIR/shell.conf" ]; then
+  . $SERVICE_DIR/shell.conf
+  if [ "$SHELL" == "KODI" ]; then
+      touch $LOCK_DIR/start.kodi
+  else
+      touch $LOCK_DIR/start.tvip
+  fi
+else
+  touch $LOCK_DIR/start.kodi
+fi

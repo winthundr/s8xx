@@ -1,0 +1,26 @@
+#!/bin/sh
+################################################################################
+#      This file is part of Alex@ELEC - http://www.alexelec.in.ua
+#      Copyright (C) 2011-2017 Alexandr Zuyev (alex@alexelec.in.ua)
+################################################################################
+
+echo "getting sources..."
+  if [ ! -d vdr-plugin-channelscan.git ]; then
+    git clone https://bitbucket.org/ua0lnj/channelscan.git vdr-plugin-channelscan.git
+  fi
+
+  cd vdr-plugin-channelscan.git
+    git pull
+    GIT_REV=`git log -n1 --format=%h`
+  cd ..
+
+echo "copying sources..."
+  rm -rf vdr-plugin-channelscan-$GIT_REV
+  cp -R vdr-plugin-channelscan.git vdr-plugin-channelscan-$GIT_REV
+
+echo "packing sources..."
+  tar cvJf vdr-plugin-channelscan-$GIT_REV.tar.xz vdr-plugin-channelscan-$GIT_REV
+
+echo "remove temporary sourcedir..."
+  rm -rf vdr-plugin-channelscan-$GIT_REV
+  rm -rf vdr-plugin-channelscan.git

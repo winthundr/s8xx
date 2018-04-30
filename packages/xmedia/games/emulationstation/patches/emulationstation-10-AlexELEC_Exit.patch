@@ -1,0 +1,77 @@
+diff -Naurp emulationstation-268e6c8/es-app/src/guis/GuiMenu.cpp emulationstation-268e6c8-patch/es-app/src/guis/GuiMenu.cpp
+--- emulationstation-268e6c8/es-app/src/guis/GuiMenu.cpp	2017-05-11 19:18:11.000000000 +0300
++++ emulationstation-268e6c8-patch/es-app/src/guis/GuiMenu.cpp	2017-05-11 19:25:55.000000000 +0300
+@@ -215,8 +215,31 @@ GuiMenu::GuiMenu(Window* window) : GuiCo
+ 			);
+ 	});
+ 
+-	addEntry("QUIT", 0x777777FF, true, 
++	addEntry("RETROARCH", 0x777777FF, true, 
+ 		[this] {
++						remove("/var/lock/start.games");
++						runSystemCommand("touch /var/lock/start.retro");
++						runSystemCommand("systemctl start retroarch.service");
++						SDL_Event ev;
++						ev.type = SDL_QUIT;
++						SDL_PushEvent(&ev);
++	});
++
++	addEntry("REBOOT", 0x777777FF, true,
++		[this] {
++						runRestartCommand();
++	});
++
++	addEntry("SHUTDOWN", 0x777777FF, true, 
++		[this] {
++						runShutdownCommand();
++	});
++
++	addEntry("KODI", 0x777777FF, true, 
++		[this] {
++						remove("/var/lock/start.games");
++						runSystemCommand("touch /var/lock/start.kodi");
++						runSystemCommand("systemctl start kodi.service");
+ 						SDL_Event ev;
+ 						ev.type = SDL_QUIT;
+ 						SDL_PushEvent(&ev);
+diff -Naurp emulationstation-268e6c8/es-app/src/main.cpp emulationstation-268e6c8-patch/es-app/src/main.cpp
+--- emulationstation-268e6c8/es-app/src/main.cpp	2017-05-11 19:18:04.000000000 +0300
++++ emulationstation-268e6c8-patch/es-app/src/main.cpp	2017-05-11 19:28:49.000000000 +0300
+@@ -255,7 +255,10 @@ int main(int argc, char* argv[])
+ 		// we can't handle es_systems.cfg file problems inside ES itself, so display the error message then quit
+ 		window.pushGui(new GuiMsgBox(&window,
+ 			errorMsg,
+-			"QUIT", [] { 
++			"QUIT", [] {
++				remove("/var/lock/start.games");
++				runSystemCommand("touch /var/lock/start.kodi");
++				runSystemCommand("systemctl start kodi.service");
+ 				SDL_Event* quit = new SDL_Event();
+ 				quit->type = SDL_QUIT;
+ 				SDL_PushEvent(quit);
+diff -Naurp emulationstation-268e6c8/es-core/src/platform.cpp emulationstation-268e6c8-patch/es-core/src/platform.cpp
+--- emulationstation-268e6c8/es-core/src/platform.cpp	2017-05-11 19:18:04.000000000 +0300
++++ emulationstation-268e6c8-patch/es-core/src/platform.cpp	2017-05-11 19:30:16.000000000 +0300
+@@ -43,20 +43,12 @@ std::string getHomePath()
+ 
+ int runShutdownCommand()
+ {
+-#ifdef WIN32 // windows
+-	return system("shutdown -s -t 0");
+-#else // osx / linux
+-	return system("sudo shutdown -h now");
+-#endif
++	return system("systemctl poweroff");
+ }
+ 
+ int runRestartCommand()
+ {
+-#ifdef WIN32 // windows
+-	return system("shutdown -r -t 0");
+-#else // osx / linux
+-	return system("sudo shutdown -r now");
+-#endif
++	return system("systemctl reboot");
+ }
+ 
+ int runSystemCommand(const std::string& cmd_utf8)

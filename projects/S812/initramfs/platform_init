@@ -1,0 +1,146 @@
+#!/bin/sh
+################################################################################
+#      This file is part of Alex@ELEC - http://www.alexelec.in.ua
+#      Copyright (C) 2011-2017 Alexandr Zuyev (alex@alexelec.in.ua)
+################################################################################
+
+display_mode=$(cat /sys/class/display/mode)
+
+# Parse command line arguments
+for arg in $(cat /proc/cmdline); do
+  case ${arg} in
+    hdmitx=*)
+      hdmitx=${arg#*=}
+      ;;
+    hdmimode=*)
+      hdmimode=${arg#*=}
+      ;;
+    bootfrom*)
+      bootfromext=1
+      ;;
+    BOOT_IMAGE=*)
+      BOOT_IMAGE=${arg#*=}
+      ;;
+    boot=*)
+      boot=${arg#*=}
+      ;;
+    disk=*)
+      disk=${arg#*=}
+      ;;
+  esac
+done
+
+# Add information where to run AlexELEC from
+if [ -z "$BOOT_IMAGE" -o -z "$boot" -o -z "$disk" ]; then
+  cmdline=$(cat /proc/cmdline)
+  if [ -n "$bootfromext" ]; then
+    cmdline="$cmdline BOOT_IMAGE=kernel.img boot=LABEL=ALEXELEC disk=LABEL=ALEXELEC_DISK"
+  else
+    cmdline="$cmdline BOOT_IMAGE=/dev/boot boot=/dev/system disk=/dev/data"
+  fi
+  echo "$cmdline" > /proc/cmdline
+fi
+
+# Enable HDMI output if cable is connected and not already enabled by u-boot
+[ -z "$hdmimode" ] && hdmimode="1080p50hz"
+if [ "$(cat /sys/class/amhdmitx/amhdmitx0/hpd_state)" != "0" ] && [ "$display_mode" != "$hdmimode" ]; then
+  display_mode="$hdmimode"
+fi
+
+echo "$display_mode" > /sys/class/display/mode
+
+# Force enable CEC if configuration parameter not present or empty
+if [ -z "$hdmitx" ]; then
+  echo 0xf > /sys/class/amhdmitx/amhdmitx0/cec_config
+fi
+
+# Enable framebuffer device
+echo 0 > /sys/class/graphics/fb0/blank
+
+# Blank fb1 to prevent static noise
+echo 1 > /sys/class/graphics/fb1/blank
+
+# Disable framebuffer scaling
+echo 0 > /sys/class/graphics/fb0/free_scale
+
+# set initial video state
+echo 1 > /sys/class/video/disable_video
+
+# Set default resolution parameters
+bpp=32;
+xRes=1280;
+yRes=720;
+
+# Get max supported display resolution by hdmi device
+maxRes=$(tail -n1 /sys/class/amhdmitx/amhdmitx0/disp_cap | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//');
+[ -z "$maxRes" ] && maxRes="$display_mode";
+
+case "$maxRes" in
+  480*)
+    xRes=720; yRes=480;
+    ;;
+  576*)
+    xRes=720; yRes=576;
+    ;;
+  1080*)
+    xRes=1920; yRes=1080;
+    ;;
+  4k2k*hz|2160p*)
+    xRes=3840; yRes=2160;
+    ;;
+  4k2ksmpte|smpte24hz)
+    xRes=4096; yRes=2160;
+    ;;
+esac
+vXRes=$xRes;
+vYRes=$(( $yRes * 2 ));
+
+# Set boot resolution by hdmimode param
+case "$display_mode" in
+  480*)
+    if [ "$vXRes" -ge 720 -a "$vYRes" -ge 960 ]; then
+      xRes=720; yRes=480;
+    fi
+    ;;
+  576*)
+    if [ "$vXRes" -ge 720 -a "$vYRes" -ge 1152 ]; then
+      xRes=720; yRes=576;
+    fi
+    ;;
+  720*)
+    if [ "$vXRes" -ge 1280 -a "$vYRes" -ge 1440 ]; then
+      xRes=1280; yRes=720;
+    fi
+    ;;
+  1080*)
+    if [ "$vXRes" -ge 1920 -a "$vYRes" -ge 2160 ]; then
+      xRes=1920; yRes=1080;
+    fi
+    ;;
+  4k2k*hz|2160p*)
+    if [ "$vXRes" -ge 3840 -a "$vYRes" -ge 4320 ]; then
+      xRes=3840; yRes=2160;
+    fi
+    ;;
+esac
+
+# Set framebuffer geometry to match the resolution
+fbset -fb /dev/fb0 -g $xRes $yRes $vXRes $vYRes $bpp;
+
+# Include deinterlacer into default VFM map
+echo rm default > /sys/class/vfm/map
+echo add default decoder ppmgr deinterlace amvideo > /sys/class/vfm/map
+
+for part in /sys/block/*/queue/add_random; do
+  echo 0 > "$part"
+done
+
+# set smp_affinity
+#            Binary       Hex
+#    CPU 0    0001         1
+#    CPU 1    0010         2
+#    CPU 2    0100         4
+#    CPU 3    1000         8
+echo 4 > /proc/irq/40/smp_affinity  # eth0
+echo 2 > /proc/irq/64/smp_affinity  # esparser
+echo 2 > /proc/irq/78/smp_affinity  # deinterlace

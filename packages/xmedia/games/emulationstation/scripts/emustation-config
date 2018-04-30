@@ -1,0 +1,108 @@
+#!/bin/sh
+################################################################################
+#      This file is part of Alex@ELEC - http://www.alexelec.in.ua
+#      Copyright (C) 2011-present Alexandr Zuyev (alex@alexelec.in.ua)
+################################################################################
+
+# RetroArch load BIOS
+BIOS_DIR="/storage/roms/bios"
+N64_DIR="/storage/roms/n64"
+
+# set video output mode
+set_video_mode () {
+  display_mode=$(cat /sys/class/display/mode)
+
+  case $display_mode in
+    480p*)
+      fbset -fb /dev/fb0 -g 720 480 720 960 32
+      ;;
+    576p*)
+      fbset -fb /dev/fb0 -g 720 576 720 1152 32
+      ;;
+    720p*)
+      echo 720p60hz > /sys/class/display/mode
+      fbset -fb /dev/fb0 -g 1280 720 1280 1440 32
+      ;;
+    1080*)
+      echo 1080p60hz > /sys/class/display/mode
+      fbset -fb /dev/fb0 -g 1920 1080 1920 2160 32
+      ;;
+    480cvbs)
+      fbset -fb /dev/fb0 -g 1280 960 1280 1920 32
+      fbset -fb /dev/fb1 -g 32 32 32 32 32
+      echo 0 0 1279 959 > /sys/class/graphics/fb0/free_scale_axis
+      echo 30 10 669 469 > /sys/class/graphics/fb0/window_axis
+      echo 640 > /sys/class/graphics/fb0/scale_width
+      echo 480 > /sys/class/graphics/fb0/scale_height
+      echo 0x10001 > /sys/class/graphics/fb0/free_scale
+      ;;
+    576cvbs)
+      fbset -fb /dev/fb0 -g 1280 960 1280 1920 32
+      fbset -fb /dev/fb1 -g 32 32 32 32 32
+      echo 0 0 1279 959 > /sys/class/graphics/fb0/free_scale_axis
+      echo 35 20 680 565 > /sys/class/graphics/fb0/window_axis
+      echo 720 > /sys/class/graphics/fb0/scale_width
+      echo 576 > /sys/class/graphics/fb0/scale_height
+      echo 0x10001 > /sys/class/graphics/fb0/free_scale
+      ;;
+  esac
+}
+
+# ping site
+ping_site () {
+  IS_SITE="false"
+  ping -4 -c 1 -W 1 alexelec.in.ua > /dev/null 2>&1
+  [ $? -eq 0 ] && IS_SITE="true"
+  echo $IS_SITE
+}
+
+# RetroArch load BIOS
+load_bios () {
+  if [ ! -f "$BIOS_DIR/received.bios" ]; then
+    mkdir -p $BIOS_DIR
+    rm -fr $BIOS_DIR/*
+    wget -t 3 -T 5 -P $BIOS_DIR "http://src.alexelec.in.ua/RetroArch/bios/BIOS.zip" > /dev/null 2>&1
+    if [ $? -eq 0 ] ; then
+        unzip -q $BIOS_DIR/BIOS.zip -d $BIOS_DIR > /dev/null 2>&1
+        rm -f $BIOS_DIR/BIOS.zip
+        touch $BIOS_DIR/received.bios
+        logger -t RetroArch "download BIOS completed."
+    else
+        logger -t RetroArch "download BIOS failure."
+    fi
+  fi
+}
+
+# load Games
+load_games () {
+  if [ ! -f "$BIOS_DIR/received.games" ]; then
+    mkdir -p $N64_DIR
+    rm -fr $N64_DIR/*Tarzan.z64
+    wget -t 3 -T 5 -P $N64_DIR "http://src.alexelec.in.ua/RetroArch/games/Tarzan.zip" > /dev/null 2>&1
+    if [ $? -eq 0 ] ; then
+        unzip -q $N64_DIR/Tarzan.zip -d $N64_DIR > /dev/null 2>&1
+        rm -f $N64_DIR/Tarzan.zip
+        logger -t RetroArch "download Games completed."
+    else
+        touch $N64_DIR/Dummy.z64
+        logger -t RetroArch "download Games failure."
+    fi
+    touch $BIOS_DIR/received.games
+  fi
+}
+
+if [ $(ping_site) == "true" ]; then
+  load_bios
+  load_games
+else
+  if [ ! -f "$BIOS_DIR/received.games" ]; then
+      touch $BIOS_DIR/received.games
+      touch $N64_DIR/Dummy.z64
+      logger -t RetroArch "Create Dummy Game."
+  fi
+  logger -t RetroArch "download BIOS/Games failure."
+fi
+
+set_video_mode
+
+exit 0

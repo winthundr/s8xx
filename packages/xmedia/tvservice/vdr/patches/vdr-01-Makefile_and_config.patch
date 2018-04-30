@@ -1,0 +1,49 @@
+diff -Naurp vdr-2.3.8/device.h vdr-2.3.8-patch/device.h
+--- vdr-2.3.8/device.h	2017-05-30 14:06:11.000000000 +0300
++++ vdr-2.3.8-patch/device.h	2017-07-04 19:52:43.000000000 +0300
+@@ -26,7 +26,7 @@
+ #include "thread.h"
+ #include "tools.h"
+ 
+-#define MAXDEVICES         16 // the maximum number of devices in the system
++#define MAXDEVICES         24 // the maximum number of devices in the system
+ #define MAXPIDHANDLES      64 // the maximum number of different PIDs per device
+ #define MAXRECEIVERS       16 // the maximum number of receivers per device
+ #define MAXVOLUME         255
+diff -Naurp vdr-2.3.8/Makefile vdr-2.3.8-patch/Makefile
+--- vdr-2.3.8/Makefile	2017-05-29 11:48:42.000000000 +0300
++++ vdr-2.3.8-patch/Makefile	2017-07-04 19:47:45.000000000 +0300
+@@ -289,6 +289,7 @@ install-dirs:
+ 	@mkdir -p $(DESTDIR)$(RESDIR)
+ 
+ install-conf:
++	@mkdir -p $(DESTDIR)$(CONFDIR)
+ 	@cp -pn *.conf $(DESTDIR)$(CONFDIR)
+ 
+ # Documentation:
+diff -Naurp vdr-2.3.8/svdrphosts.conf vdr-2.3.8-patch/svdrphosts.conf
+--- vdr-2.3.8/svdrphosts.conf	2006-04-17 15:19:27.000000000 +0300
++++ vdr-2.3.8-patch/svdrphosts.conf	2017-07-04 19:49:06.000000000 +0300
+@@ -7,7 +7,8 @@
+ # IP-Address[/Netmask]
+ #
+ 
+-127.0.0.1             # always accept localhost
++#127.0.0.1            # always accept localhost
+ #192.168.100.0/24     # any host on the local net
+ #204.152.189.113      # a specific host
+-#0.0.0.0/0            # any host on any net (USE THIS WITH CARE!)
++
++0.0.0.0/0             # any host on any net (USE THIS WITH CARE!)
+diff -Naurp vdr-2.3.8/vdr.c vdr-2.3.8-patch/vdr.c
+--- vdr-2.3.8/vdr.c	2017-06-08 19:10:34.000000000 +0300
++++ vdr-2.3.8-patch/vdr.c	2017-07-04 19:50:04.000000000 +0300
+@@ -80,7 +80,7 @@
+ #define SHUTDOWNCANCELPROMPT   5 // seconds to wait in user prompt to allow canceling shutdown
+ #define RESTARTCANCELPROMPT    5 // seconds to wait in user prompt before restarting on SIGHUP
+ #define MANUALSTART          600 // seconds the next timer must be in the future to assume manual start
+-#define CHANNELSAVEDELTA     600 // seconds before saving channels.conf after automatic modifications
++#define CHANNELSAVEDELTA     120 // seconds before saving channels.conf after automatic modifications
+ #define DEVICEREADYTIMEOUT    30 // seconds to wait until all devices are ready
+ #define MENUTIMEOUT          120 // seconds of user inactivity after which an OSD display is closed
+ #define TIMERCHECKDELTA       10 // seconds between checks for timers that need to see their channel

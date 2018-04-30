@@ -1,0 +1,30 @@
+diff -Naurp boblightd-479/src/main.cpp boblightd-479-patch/src/main.cpp
+--- boblightd-479/src/main.cpp	2015-01-15 15:12:56.000000000 +0200
++++ boblightd-479-patch/src/main.cpp	2015-01-15 17:14:23.000000000 +0200
+@@ -30,7 +30,7 @@
+ #include "device/device.h"
+ #include "config.h"
+ 
+-#define DEFAULTCONF "/etc/boblight.conf"
++#define DEFAULTCONF "/storage/.config/boblight/boblight.conf"
+ 
+ using namespace std;
+ 
+diff -Naurp boblightd-479/src/util/log.cpp boblightd-479-patch/src/util/log.cpp
+--- boblightd-479/src/util/log.cpp	2015-01-15 15:12:56.000000000 +0200
++++ boblightd-479-patch/src/util/log.cpp	2015-01-15 17:10:30.000000000 +0200
+@@ -61,13 +61,8 @@ string GetStrTime()
+ 
+ bool InitLog(string filename, ofstream& logfile)
+ {
+-  if (!getenv("HOME"))
+-  {
+-    PrintError("$HOME is not set");
+-    return false;
+-  }
+   
+-  string directory = static_cast<string>(getenv("HOME")) + "/.boblight/";
++  string directory = "/var/log/";
+   string fullpath = directory + filename;
+ 
+   //try to make the directory the log goes in

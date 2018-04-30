@@ -1,0 +1,23 @@
+diff -Naurp vdr-plugin-osd2web-968110a/Make.config vdr-plugin-osd2web-968110a-patch/Make.config
+--- vdr-plugin-osd2web-968110a/Make.config	2017-07-03 16:45:14.000000000 +0300
++++ vdr-plugin-osd2web-968110a-patch/Make.config	2017-07-07 13:42:33.000000000 +0300
+@@ -7,8 +7,8 @@
+ # user defined stuff
+ 
+ #PATCHED = 1
+-PREFIX   = /usr/local
+-DEBUG = 1
++PREFIX   = /usr
++#DEBUG = 1
+ #USE_CLANG = 1
+ 
+ # -----------------------
+@@ -17,7 +17,7 @@ DEBUG = 1
+ ifdef USE_CLANG
+   CC = clang++
+ else
+-  CC = g++
++  CC = $(CXX)
+ endif
+ 
+ doCompile = $(CC) -c $(CFLAGS) $(DEFINES)

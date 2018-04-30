@@ -1,0 +1,71 @@
+diff -Naurp scan-s2-46/dump-vdr.c scan-s2-46-patch/dump-vdr.c
+--- scan-s2-46/dump-vdr.c	2017-08-18 11:40:33.000000000 +0300
++++ scan-s2-46-patch/dump-vdr.c	2017-08-18 17:37:20.000000000 +0300
+@@ -190,11 +190,11 @@ void vdr_dump_dvb_parameters (FILE *f, t
+ 			fprintf (f, "M%s", qam_name[t->modulation]);
+ 			fprintf (f, "T%s", mode_name[t->transmission_mode]);
+ 			fprintf (f, "G%s", guard_name[t->guard_interval]);
+-			if(t->delivery_system == SYS_DVBT2)
+-			{
+-				fprintf (f, "S1");
++			fprintf (f, "S1");
++			if (t->stream_id == -1)
++				fprintf (f, "P%i", 0);
++			else
+ 				fprintf (f, "P%i", t->stream_id);
+-			}
+ 			fprintf (f, ":T:27500:");
+ 			break;
+ 
+@@ -225,27 +225,49 @@ void vdr_dump_service_parameter_set (FIL
+ 		vdr_dump_dvb_parameters (f, t, orbital_pos_override);
+ 
+ 		if ((s->pcr_pid != s->video_pid) && (s->video_pid > 0))
+-			fprintf (f, "%i+%i:", s->video_pid, s->pcr_pid);
++			fprintf (f, "%i+%i", s->video_pid, s->pcr_pid);
++		else
++			fprintf (f, "%i", s->video_pid);
++
++		if(t->delivery_system == SYS_DVBT2)
++			fprintf (f, "=27:");
+ 		else
+-			fprintf (f, "%i:", s->video_pid);
++			fprintf (f, ":");
+ 
+ 		fprintf (f, "%i", s->audio_pid[0]);
+ 
+ 		if (s->audio_lang && s->audio_lang[0][0])
++		{
+ 			fprintf (f, "=%.4s", s->audio_lang[0]);
++			if(t->delivery_system == SYS_DVBT2)
++				fprintf (f, "@3");
++		}
++		else
++		{
++			if(t->delivery_system == SYS_DVBT2)
++				fprintf (f, "=@3");
++		}
+ 
+ 		for (i = 1; i < s->audio_num; i++)
+ 		{
+ 			fprintf (f, ",%i", s->audio_pid[i]);
+ 			if (s->audio_lang && s->audio_lang[i][0])
++			{
+ 				fprintf (f, "=%.4s", s->audio_lang[i]);
++				if(t->delivery_system == SYS_DVBT2)
++					fprintf (f, "@3");
++			}
+ 		}
+ 
+ 		if (s->ac3_pid)
+ 		{
+ 			fprintf (f, ";%i", s->ac3_pid);
+ 			if (s->audio_lang && s->audio_lang[0][0])
++			{
+ 				fprintf (f, "=%.4s", s->audio_lang[0]);
++				if(t->delivery_system == SYS_DVBT2)
++					fprintf (f, "@3");
++			}
+ 		}
+ 
+ 		fprintf (f, ":%d:", s->teletext_pid);

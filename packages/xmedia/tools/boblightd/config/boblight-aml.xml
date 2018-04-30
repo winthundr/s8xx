@@ -1,0 +1,10 @@
+<settings>
+    <setting id="movie_speed" value="100.0" />
+    <setting id="movie_autospeed" value="0.0" />
+    <setting id="movie_interpolation" value="false" />
+    <setting id="movie_saturation" value="1.0" />
+    <setting id="movie_value" value="1.0" />
+    <setting id="movie_threshold" value="0" />
+    <setting id="hostip" value="127.0.0.1" />
+    <setting id="hostport" value="19333" />
+</settings>

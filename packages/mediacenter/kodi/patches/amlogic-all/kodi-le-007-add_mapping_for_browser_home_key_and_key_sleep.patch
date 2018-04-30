@@ -1,0 +1,29 @@
+diff -Naurp kodi-17.1-rc2-5814568/xbmc/input/linux/LinuxInputDevices.cpp kodi-17.1-rc2-5814568-patch/xbmc/input/linux/LinuxInputDevices.cpp
+--- kodi-17.1-rc2-5814568/xbmc/input/linux/LinuxInputDevices.cpp	2017-03-17 08:27:32.000000000 +0200
++++ kodi-17.1-rc2-5814568-patch/xbmc/input/linux/LinuxInputDevices.cpp	2017-03-17 08:44:19.000000000 +0200
+@@ -228,7 +228,7 @@ KeyMap keyMap[] = {
+   { KEY_VOLUMEDOWN    , XBMCK_VOLUME_DOWN },
+   { KEY_VOLUMEUP      , XBMCK_VOLUME_UP   },
+   { KEY_POWER         , XBMCK_POWER       },
+-  { KEY_SLEEP         , XBMCK_POWER       },
++  { KEY_COFFEE        , XBMCK_VOLUME_MUTE },
+   { KEY_KPEQUAL       , XBMCK_KP_EQUALS   },
+   { KEY_PAUSE         , XBMCK_PAUSE       },
+   { KEY_PAUSECD       , XBMCK_PAUSE       },
+@@ -237,6 +237,8 @@ KeyMap keyMap[] = {
+   { KEY_COMPOSE       , XBMCK_LSUPER      },
+   { KEY_STOP          , XBMCK_MEDIA_STOP  },
+   { KEY_HELP          , XBMCK_HELP        },
++  { KEY_SLEEP         , XBMCK_SLEEP       },
++  { KEY_WAKEUP        , XBMCK_SLEEP       },
+   { KEY_MENU          , XBMCK_MENU        },
+   { KEY_CLOSECD       , XBMCK_EJECT       },
+   { KEY_EJECTCD       , XBMCK_EJECT       },
+@@ -248,6 +250,7 @@ KeyMap keyMap[] = {
+   { KEY_RECORD        , XBMCK_RECORD      },
+   { KEY_REWIND        , XBMCK_REWIND      },
+   { KEY_PHONE         , XBMCK_PHONE       },
++  { KEY_HOMEPAGE      , XBMCK_BROWSER_HOME},
+   { KEY_REFRESH       , XBMCK_SHUFFLE     },
+   { KEY_SCROLLUP      , XBMCK_PAGEUP      },
+   { KEY_SCROLLDOWN    , XBMCK_PAGEDOWN    },

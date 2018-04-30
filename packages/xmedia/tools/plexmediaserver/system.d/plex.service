@@ -1,0 +1,16 @@
+[Unit]
+Description=Plex Media Server
+Requires=network-online.target
+After=network-online.target
+ConditionPathExists=/storage/.cache/services/plex.conf
+
+[Service]
+ExecStart=/usr/bin/plex.start
+TimeoutStopSec=5
+Restart=on-success
+RestartSec=2
+StartLimitInterval=0
+StandardOutput=null
+
+[Install]
+WantedBy=multi-user.target

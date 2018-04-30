@@ -1,0 +1,11 @@
+--- iptv/protocolext.c_orig	2014-03-23 07:19:22.470616336 +0100
++++ iptv/protocolext.c	2014-03-22 21:59:07.640891780 +0100
+@@ -20,7 +20,7 @@
+ #include "protocolext.h"
+ 
+ #ifndef EXTSHELL
+-#define EXTSHELL "/bin/bash"
++#define EXTSHELL "/bin/sh"
+ #endif
+ 
+ cIptvProtocolExt::cIptvProtocolExt()

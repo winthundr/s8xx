@@ -1,0 +1,19 @@
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -6,6 +6,7 @@
+ 
+ include ../Make.config
+ 
++INCLUDES += -I$(VDRDIR)/include
+ LIBTARGET = libhorchi
+ HLIB      = -L. -lhorchi
+ 
+@@ -96,7 +97,7 @@ cppchk:
+ 
+ %.o: %.c
+ 	@echo Compile "$(*F)" ...
+-	$(doCompile) $(*F).c -o $@
++	$(doCompile) $(INCLUDES) $(*F).c -o $@
+ 
+ #--------------------------------------------------------
+ # dependencies

@@ -1,0 +1,69 @@
+#!/bin/sh
+################################################################################
+#      This file is part of Alex@ELEC - http://www.alexelec.in.ua
+#      Copyright (C) 2011-present Alexandr Zuyev (alex@alexelec.in.ua)
+################################################################################
+
+. /etc/profile
+
+SERVICE_DIR="/storage/.cache/services"
+LOG_TVH="/var/log/tvheadend.log"
+LOG_TVH_OLD="/var/log/tvheadend.log.old"
+TVH_HOME="/storage/.config/tvheadend"
+
+. $SERVICE_DIR/tvheadend.conf
+
+[ -f "$SERVICE_DIR/dvb-driver.conf" ] && . $SERVICE_DIR/dvb-driver.conf
+[ -z "$DVB_FEINIT" ] && DVB_FEINIT=0
+
+if [ "$TVH_DEBUG" == "1" ]; then
+  [ -f "$LOG_TVH" ] && mv -f $LOG_TVH $LOG_TVH_OLD
+  TVHEADEND_ARG="-B -C -u root -g video -c $TVH_HOME -l $LOG_TVH -S"
+else
+  TVHEADEND_ARG="-B -C -u root -g video -c $TVH_HOME -S"
+fi
+
+if [ "$TVH_BINDADDR" != "All" -a "$TVH_BINDADDR" != "" ] ; then
+  TVHEADEND_ARG="$TVHEADEND_ARG -b $TVH_BINDADDR"
+
+  ping -q -4 -c 1 -w 1 $TVH_BINDADDR > /dev/null 2>&1
+  if [ "$?" != "0" ]; then
+    # wait network
+    [ -z "$TVH_TIMEOUT" ] && TVH_TIMEOUT=5
+    TIMEOUT=$(expr $TVH_TIMEOUT \* 4)
+    for i in $(seq 1 $TIMEOUT) ; do
+        ping -q -4 -c 1 -w 1 $TVH_BINDADDR > /dev/null 2>&1
+        if [ "$?" == "0" ]; then
+            usleep 500000
+            logger -t tvheadend "Tvheadend wait network: $i count"
+            break
+        fi
+        usleep 250000
+    done
+  fi
+
+fi
+
+CPU_ARCH=$(uname -m)
+[ "$CPU_ARCH" != "aarch64" ] && echo 'performance' > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+
+# TTV iptv config
+if [ ! -f "$TVH_HOME/ttv-iptv.copy" -a -d /usr/share/tvheadend/iptv ]; then
+  if [ ! -d "$TVH_HOME/input/iptv" ]; then
+    mkdir -p $TVH_HOME/input
+    cp -a /usr/share/tvheadend/iptv $TVH_HOME/input
+  fi
+  touch $TVH_HOME/ttv-iptv.copy
+fi
+
+if [ "$DVB_FEINIT" == "1" ] ; then
+  TIMEOUT=30
+  for i in $(seq 1 $TIMEOUT) ; do
+    [ -e /dev/dvb/adapter0/frontend0 ] && break
+    sleep 1
+  done
+else
+  [ -f "$SERVICE_DIR/oscam.conf" ] && sleep 3
+fi
+
+echo "TVH_ARGS=\"$TVHEADEND_ARG\"" > /run/alexelec/tvh.conf

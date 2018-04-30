@@ -1,0 +1,54 @@
+#!/bin/sh
+################################################################################
+#      This file is part of Alex@ELEC - http://www.alexelec.in.ua
+#      Copyright (C) 2011-present Alexandr Zuyev (alex@alexelec.in.ua)
+################################################################################
+
+#GIT_URL="https://github.com/AndreyPavlenko/aceproxy.git"
+GIT_URL="https://github.com/pepsik-kiev/aceproxy.git"
+
+echo "getting sources..."
+  if [ ! -d aceproxy.git ]; then
+    git clone $GIT_URL aceproxy.git
+  fi
+
+  cd aceproxy.git
+    git pull
+    GIT_REV=`git log -n1 --format=%h`
+  cd ..
+
+echo "copying sources..."
+  rm -rf aceproxy-$GIT_REV
+  mkdir -p aceproxy-$GIT_REV
+  cp -R aceproxy.git aceproxy-$GIT_REV/aceproxy
+
+echo "cleaning sources..."
+  rm -rf aceproxy-$GIT_REV/aceproxy/.git
+  rm -rf aceproxy-$GIT_REV/aceproxy/systemd
+  rm -f aceproxy-$GIT_REV/aceproxy/.gitignore
+  rm -f aceproxy-$GIT_REV/aceproxy/requirements.txt
+  rm -f aceproxy-$GIT_REV/aceproxy/setup_win32.py
+
+echo "make install package..."  
+  cd aceproxy-$GIT_REV
+cat > install <<EOF
+#!/bin/sh
+################################################################################
+#      This file is part of Alex@ELEC - http://www.alexelec.in.ua
+#      Copyright (C) 2011-present Alexandr Zuyev (alex@alexelec.in.ua)
+################################################################################
+
+FW_DIR="\$DESTDIR/usr/config"
+
+mkdir -p \$FW_DIR
+  cp -a aceproxy \$FW_DIR
+EOF
+    chmod +x install
+  cd ..
+
+echo "packing sources..."
+  tar cvJf aceproxy-$GIT_REV.tar.xz aceproxy-$GIT_REV
+
+echo "remove temporary sourcedir..."
+  rm -rf aceproxy-$GIT_REV
+  rm -rf aceproxy.git

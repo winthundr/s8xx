@@ -1,0 +1,11 @@
+# VERSION: set full version
+  ALEXELEC_VERSION="2.3.7"
+
+# OS_VERSION: OS Version
+  OS_VERSION="2.3"
+
+# ADDON_VERSION: Addon version
+  ADDON_VERSION="2.3"
+
+# ALEXELEC_BUILD: devel or release
+  ALEXELEC_BUILD="release"

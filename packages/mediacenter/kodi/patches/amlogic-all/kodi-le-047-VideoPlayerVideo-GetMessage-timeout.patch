@@ -1,0 +1,12 @@
+diff -Naurp kodi-17.6-7e52c1d/xbmc/cores/VideoPlayer/VideoPlayerVideo.cpp kodi-17.6-7e52c1d-patch/xbmc/cores/VideoPlayer/VideoPlayerVideo.cpp
+--- kodi-17.6-7e52c1d/xbmc/cores/VideoPlayer/VideoPlayerVideo.cpp	2018-04-03 11:10:11.000000000 +0300
++++ kodi-17.6-7e52c1d-patch/xbmc/cores/VideoPlayer/VideoPlayerVideo.cpp	2018-04-03 11:11:53.000000000 +0300
+@@ -259,7 +259,7 @@ void CVideoPlayerVideo::Process()
+ 
+   while (!m_bStop)
+   {
+-    int iQueueTimeOut = (int)(m_stalled ? frametime : frametime * 10) / 1000;
++    int iQueueTimeOut = (int)(m_stalled ? frametime * 10 : frametime * 11) / 10000;
+     int iPriority = (m_speed == DVD_PLAYSPEED_PAUSE && m_syncState == IDVDStreamPlayer::SYNC_INSYNC) ? 1 : 0;
+ 
+     if (m_syncState == IDVDStreamPlayer::SYNC_WAITSYNC)

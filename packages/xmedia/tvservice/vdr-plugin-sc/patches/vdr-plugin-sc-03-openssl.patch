@@ -1,0 +1,53 @@
+diff -Naurp vdr-plugin-sc-a6fc7dc/crypto.h vdr-plugin-sc-a6fc7dc-patch/crypto.h
+--- vdr-plugin-sc-a6fc7dc/crypto.h	2014-11-06 00:35:48.000000000 +0200
++++ vdr-plugin-sc-a6fc7dc-patch/crypto.h	2017-07-24 10:37:13.000000000 +0300
+@@ -32,10 +32,6 @@
+ #include <openssl/opensslconf.h>
+ #include <openssl/opensslv.h>
+ 
+-#if OPENSSL_VERSION_NUMBER < 0x0090700fL
+-#error Openssl version 0.9.7 or newer is strongly recomended
+-#endif
+-
+ #include "crypto-bn.h"
+ 
+ // ----------------------------------------------------------------
+@@ -79,12 +75,8 @@ public:
+ 
+ // ----------------------------------------------------------------
+ 
+-#if defined(OPENSSL_NO_AES) | defined(NO_AES) | OPENSSL_VERSION_NUMBER<0x0090700fL
+-#include "support/aes.h"
+-#else
+ #define OPENSSL_HAS_AES
+ #include <openssl/aes.h>
+-#endif
+ 
+ class cAES {
+ private:
+@@ -100,12 +92,8 @@ public:
+ 
+ // ----------------------------------------------------------------
+ 
+-#if defined(OPENSSL_NO_IDEA) | defined(NO_IDEA) | OPENSSL_VERSION_NUMBER<0x0090700fL
+-#include "support/idea.h"
+-#else
+ #define OPENSSL_HAS_IDEA
+ #include <openssl/idea.h>
+-#endif
+ 
+ typedef IDEA_KEY_SCHEDULE IdeaKS;
+ 
+diff -Naurp vdr-plugin-sc-a6fc7dc/systems/nagra/nagra2.c vdr-plugin-sc-a6fc7dc-patch/systems/nagra/nagra2.c
+--- vdr-plugin-sc-a6fc7dc/systems/nagra/nagra2.c	2014-11-06 00:35:48.000000000 +0200
++++ vdr-plugin-sc-a6fc7dc-patch/systems/nagra/nagra2.c	2017-07-24 10:39:48.000000000 +0300
+@@ -498,9 +498,6 @@ bool cMapMath::ModSub(BIGNUM *r, BIGNUM
+ 
+ void cMapMath::MakeJ0(BIGNUM *j, BIGNUM *d, BIGNUM *c, int bits)
+ {
+-#if OPENSSL_VERSION_NUMBER < 0x0090700fL
+-#error BN_mod_inverse is probably buggy in your openssl version
+-#endif
+   BN_zero(x);
+   BN_sub(j,x,d); j->neg=1;
+   BN_set_bit(j,0);

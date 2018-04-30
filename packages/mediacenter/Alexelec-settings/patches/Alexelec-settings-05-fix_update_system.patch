@@ -1,0 +1,24 @@
+diff -Naurp Alexelec-settings-30c0064/src/resources/bin/update.sh Alexelec-settings-30c0064-patch/src/resources/bin/update.sh
+--- Alexelec-settings-30c0064/src/resources/bin/update.sh	2017-11-06 16:44:25.000000000 +0200
++++ Alexelec-settings-30c0064-patch/src/resources/bin/update.sh	2018-04-29 16:55:57.000000000 +0300
+@@ -7,7 +7,7 @@
+ . /etc/os-release
+ 
+ URL_MAIN="https://github.com/AlexELEC/AlexELEC-AML/releases/download"
+-URL_LAST="https://raw.githubusercontent.com/AlexELEC/update/master/amlogic/latest"
++URL_LAST="https://raw.githubusercontent.com/AlexELEC/AlexELEC-AML/master/latest"
+ 
+ NAME_CURRENT="$(cat /etc/release)"
+ NAME_UPDATE="${NAME_CURRENT/-[0-9]*/}"
+@@ -42,7 +42,10 @@ elif [ "$1" == "reboot" ] ; then
+ 
+   CONF_DIR="/storage/.config"
+   systemctl stop kodi
+-  [ -f "/storage/.cache/services/acestream.conf" ] && systemctl stop acestream
++  if [ -f "/storage/.cache/services/acestream.conf" ]; then
++      systemctl stop acestream
++      rm -f /storage/.cache/services/acestream.conf
++  fi
+   rm -rf "$CONF_DIR/acephproxy" "$CONF_DIR/aceproxy" "$CONF_DIR/acestream" "$CONF_DIR/kodi.skins" "$CONF_DIR/noxbit" "$CONF_DIR/emulationstation" "$CONF_DIR/retroarch"
+   /usr/sbin/reboot
+ 

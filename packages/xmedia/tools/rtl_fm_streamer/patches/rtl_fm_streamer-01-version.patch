@@ -1,0 +1,12 @@
+diff -Naurp rtl_fm_streamer-f3a1b86/CMakeLists.txt rtl_fm_streamer-f3a1b86-patch/CMakeLists.txt
+--- rtl_fm_streamer-f3a1b86/CMakeLists.txt	2017-03-15 00:13:40.000000000 +0200
++++ rtl_fm_streamer-f3a1b86-patch/CMakeLists.txt	2017-07-27 11:13:49.000000000 +0300
+@@ -40,7 +40,7 @@ endif()
+ # Set the version information here
+ set(VERSION_INFO_MAJOR_VERSION 0) # increment major on api compatibility changes
+ set(VERSION_INFO_MINOR_VERSION 5) # increment minor on feature-level changes
+-set(VERSION_INFO_PATCH_VERSION git) # increment patch for bug fixes and docs
++set(VERSION_INFO_PATCH_VERSION 1) # increment patch for bug fixes and docs
+ include(Version) # setup version info
+ 
+ ########################################################################

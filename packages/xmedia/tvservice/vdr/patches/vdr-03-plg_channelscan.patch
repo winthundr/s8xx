@@ -1,0 +1,40 @@
+diff -Naurp vdr-2.3.8/device.c vdr-2.3.8-patch/device.c
+--- vdr-2.3.8/device.c	2017-05-30 14:06:11.000000000 +0300
++++ vdr-2.3.8-patch/device.c	2017-07-04 20:01:20.000000000 +0300
+@@ -20,6 +20,10 @@
+ #include "status.h"
+ #include "transfer.h"
+ 
++// --- channelscan -----------------------------------------------------------
++
++bool scanning_on_receiving_device = false;
++
+ // --- cLiveSubtitle ---------------------------------------------------------
+ 
+ class cLiveSubtitle : public cReceiver {
+diff -Naurp vdr-2.3.8/device.h vdr-2.3.8-patch/device.h
+--- vdr-2.3.8/device.h	2017-07-04 19:53:56.000000000 +0300
++++ vdr-2.3.8-patch/device.h	2017-07-04 20:01:17.000000000 +0300
+@@ -35,6 +35,10 @@
+ 
+ enum eSetChannelResult { scrOk, scrNotAvailable, scrNoTransfer, scrFailed };
+ 
++// --- channelscan -----------------------------------------------------------
++
++extern bool scanning_on_receiving_device;
++
+ // Note that VDR itself always uses pmAudioVideo when replaying a recording!
+ enum ePlayMode { pmNone,           // audio/video from decoder
+                  pmAudioVideo,     // audio/video from player
+diff -Naurp vdr-2.3.8/vdr.c vdr-2.3.8-patch/vdr.c
+--- vdr-2.3.8/vdr.c	2017-07-04 19:53:56.000000000 +0300
++++ vdr-2.3.8-patch/vdr.c	2017-07-04 20:02:24.000000000 +0300
+@@ -963,7 +963,7 @@ int main(int argc, char *argv[])
+         if (!EITScanner.Active() && cDevice::PrimaryDevice()->HasDecoder()) {
+            static time_t lastTime = 0;
+            if (!cDevice::PrimaryDevice()->HasProgramme()) {
+-              if (!CamMenuActive() && Now - lastTime > MINCHANNELWAIT) { // !CamMenuActive() to avoid interfering with the CAM if a CAM menu is open
++              if (!CamMenuActive() && !scanning_on_receiving_device && Now - lastTime > MINCHANNELWAIT) { // !CamMenuActive() to avoid interfering with the CAM if a CAM menu is open
+                  LOCK_CHANNELS_READ;
+                  const cChannel *Channel = Channels->GetByNumber(cDevice::CurrentChannel());
+                  if (Channel && (Channel->Vpid() || Channel->Apid(0) || Channel->Dpid(0))) {

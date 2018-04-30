@@ -1,0 +1,65 @@
+diff -Naurp linux-fb5b898/arch/arm/mach-meson8b/hdmi_tx_hw/hdmi_tx_cec_hw.c linux-fb5b898-patch/arch/arm/mach-meson8b/hdmi_tx_hw/hdmi_tx_cec_hw.c
+--- linux-fb5b898/arch/arm/mach-meson8b/hdmi_tx_hw/hdmi_tx_cec_hw.c	2016-12-15 18:49:08.000000000 +0200
++++ linux-fb5b898-patch/arch/arm/mach-meson8b/hdmi_tx_hw/hdmi_tx_cec_hw.c	2017-04-07 15:05:07.000000000 +0300
+@@ -87,7 +87,7 @@ void cec_hw_reset(void)
+     cec_arbit_bit_time_set(5, 0x000, 0);
+     cec_arbit_bit_time_set(7, 0x2aa, 0);
+ 
+-    hdmi_print(INF, CEC "hw reset :logical addr:0x%x\n", aocec_rd_reg(CEC_LOGICAL_ADDR0));
++    //hdmi_print(INF, CEC "hw reset :logical addr:0x%x\n", aocec_rd_reg(CEC_LOGICAL_ADDR0));
+ 
+ }
+ 
+@@ -95,15 +95,15 @@ void cec_rx_buf_clear(void)
+ {
+     aocec_wr_reg(CEC_RX_CLEAR_BUF, 0x1);
+     aocec_wr_reg(CEC_RX_CLEAR_BUF, 0x0);
+-    hdmi_print(INF, CEC "rx buf clean\n");
++    //hdmi_print(INF, CEC "rx buf clean\n");
+ }
+ 
+ int cec_rx_buf_check(void)
+ {
+     unsigned long rx_num_msg = aocec_rd_reg(CEC_RX_NUM_MSG);
+ 
+-    if (rx_num_msg)
+-        hdmi_print(INF, CEC "rx msg num:0x%02x\n", rx_num_msg);
++    //if (rx_num_msg)
++    //    hdmi_print(INF, CEC "rx msg num:0x%02x\n", rx_num_msg);
+ 
+     return rx_num_msg;
+ }
+diff -Naurp linux-fb5b898/drivers/amlogic/hdmi/hdmi_tx/amlogic_cec.c linux-fb5b898-patch/drivers/amlogic/hdmi/hdmi_tx/amlogic_cec.c
+--- linux-fb5b898/drivers/amlogic/hdmi/hdmi_tx/amlogic_cec.c	2016-12-15 18:49:08.000000000 +0200
++++ linux-fb5b898-patch/drivers/amlogic/hdmi/hdmi_tx/amlogic_cec.c	2017-04-07 14:49:12.000000000 +0300
+@@ -445,8 +445,8 @@ static ssize_t amlogic_cec_write(struct
+     // don't write if cec_node_init() is in progress
+     if (down_interruptible(&init_mutex))
+     {
+-        amlogic_cec_log_dbg("error during wait on state change\n");
+-        printk(KERN_ERR "[amlogic] ##### cec write error! #####\n");
++        //amlogic_cec_log_dbg("error during wait on state change\n");
++        //printk(KERN_ERR "[amlogic] ##### cec write error! #####\n");
+         return -ERESTARTSYS;
+     }
+ 
+@@ -455,8 +455,8 @@ static ssize_t amlogic_cec_write(struct
+     if (wait_event_interruptible_timeout(cec_tx_struct.waitq,
+         atomic_read(&cec_tx_struct.state) != STATE_TX, 2 * HZ) <= 0)
+     {
+-        amlogic_cec_log_dbg("error during wait on state change, resetting\n");
+-        printk(KERN_ERR "[amlogic] ##### cec write error! #####\n");
++        //amlogic_cec_log_dbg("error during wait on state change, resetting\n");
++        //printk(KERN_ERR "[amlogic] ##### cec write error! #####\n");
+         cec_hw_reset();
+         retval = -ERESTARTSYS;
+         goto error_exit;
+@@ -464,7 +464,7 @@ static ssize_t amlogic_cec_write(struct
+ 
+     if (atomic_read(&cec_tx_struct.state) != STATE_DONE)
+     {
+-        printk(KERN_ERR "[amlogic] ##### cec write error! #####\n");
++        //printk(KERN_ERR "[amlogic] ##### cec write error! #####\n");
+         retval = -1;
+     }
+ 

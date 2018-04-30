@@ -1,0 +1,1005 @@
+diff -Naurp media_build_cc-20170628/linux/drivers/media/dvb-frontends/cxd2820r_c.c media_build_cc-20170628-patch/linux/drivers/media/dvb-frontends/cxd2820r_c.c
+--- media_build_cc-20170628/linux/drivers/media/dvb-frontends/cxd2820r_c.c	2017-06-28 15:11:40.000000000 +0300
++++ media_build_cc-20170628-patch/linux/drivers/media/dvb-frontends/cxd2820r_c.c	2017-08-19 16:21:26.000000000 +0300
+@@ -26,7 +26,7 @@ int cxd2820r_set_frontend_c(struct dvb_f
+ 	struct cxd2820r_priv *priv = fe->demodulator_priv;
+ 	struct i2c_client *client = priv->client[0];
+ 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
+-	int ret;
++	int ret, i;
+ 	unsigned int utmp;
+ 	u8 buf[2];
+ 	u32 if_frequency;
+@@ -58,9 +58,12 @@ int cxd2820r_set_frontend_c(struct dvb_f
+ 		fe->ops.tuner_ops.set_params(fe);
+ 
+ 	if (priv->delivery_system !=  SYS_DVBC_ANNEX_A) {
+-		ret = cxd2820r_wr_reg_val_mask_tab(priv, tab, ARRAY_SIZE(tab));
+-		if (ret)
+-			goto error;
++		for (i = 0; i < ARRAY_SIZE(tab); i++) {
++			ret = cxd2820r_wr_reg_mask(priv, tab[i].reg,
++				tab[i].val, tab[i].mask);
++			if (ret)
++				goto error;
++		}
+ 	}
+ 
+ 	priv->delivery_system = SYS_DVBC_ANNEX_A;
+@@ -80,15 +83,15 @@ int cxd2820r_set_frontend_c(struct dvb_f
+ 	utmp = 0x4000 - DIV_ROUND_CLOSEST_ULL((u64)if_frequency * 0x4000, CXD2820R_CLK);
+ 	buf[0] = (utmp >> 8) & 0xff;
+ 	buf[1] = (utmp >> 0) & 0xff;
+-	ret = regmap_bulk_write(priv->regmap[1], 0x0042, buf, 2);
++	ret = cxd2820r_wr_regs(priv, 0x10042, buf, 2);
+ 	if (ret)
+ 		goto error;
+ 
+-	ret = regmap_write(priv->regmap[0], 0x00ff, 0x08);
++	ret = cxd2820r_wr_reg(priv, 0x000ff, 0x08);
+ 	if (ret)
+ 		goto error;
+ 
+-	ret = regmap_write(priv->regmap[0], 0x00fe, 0x01);
++	ret = cxd2820r_wr_reg(priv, 0x000fe, 0x01);
+ 	if (ret)
+ 		goto error;
+ 
+@@ -104,22 +107,21 @@ int cxd2820r_get_frontend_c(struct dvb_f
+ 	struct cxd2820r_priv *priv = fe->demodulator_priv;
+ 	struct i2c_client *client = priv->client[0];
+ 	int ret;
+-	unsigned int utmp;
+ 	u8 buf[2];
+ 
+ 	dev_dbg(&client->dev, "\n");
+ 
+-	ret = regmap_bulk_read(priv->regmap[1], 0x001a, buf, 2);
++	ret = cxd2820r_rd_regs(priv, 0x1001a, buf, 2);
+ 	if (ret)
+ 		goto error;
+ 
+ 	c->symbol_rate = 2500 * ((buf[0] & 0x0f) << 8 | buf[1]);
+ 
+-	ret = regmap_read(priv->regmap[1], 0x0019, &utmp);
++	ret = cxd2820r_rd_reg(priv, 0x10019, &buf[0]);
+ 	if (ret)
+ 		goto error;
+ 
+-	switch ((utmp >> 0) & 0x07) {
++	switch ((buf[0] >> 0) & 0x07) {
+ 	case 0:
+ 		c->modulation = QAM_16;
+ 		break;
+@@ -137,7 +139,7 @@ int cxd2820r_get_frontend_c(struct dvb_f
+ 		break;
+ 	}
+ 
+-	switch ((utmp >> 7) & 0x01) {
++	switch ((buf[0] >> 7) & 0x01) {
+ 	case 0:
+ 		c->inversion = INVERSION_OFF;
+ 		break;
+@@ -162,10 +164,10 @@ int cxd2820r_read_status_c(struct dvb_fr
+ 	u8 buf[3];
+ 
+ 	/* Lock detection */
+-	ret = regmap_bulk_read(priv->regmap[1], 0x0088, &buf[0], 1);
++	ret = cxd2820r_rd_reg(priv, 0x10088, &buf[0]);
+ 	if (ret)
+ 		goto error;
+-	ret = regmap_bulk_read(priv->regmap[1], 0x0073, &buf[1], 1);
++	ret = cxd2820r_rd_reg(priv, 0x10073, &buf[1]);
+ 	if (ret)
+ 		goto error;
+ 
+@@ -189,7 +191,7 @@ int cxd2820r_read_status_c(struct dvb_fr
+ 	if (*status & FE_HAS_SIGNAL) {
+ 		unsigned int strength;
+ 
+-		ret = regmap_bulk_read(priv->regmap[1], 0x0049, buf, 2);
++		ret = cxd2820r_rd_regs(priv, 0x10049, buf, 2);
+ 		if (ret)
+ 			goto error;
+ 
+@@ -210,11 +212,11 @@ int cxd2820r_read_status_c(struct dvb_fr
+ 	if (*status & FE_HAS_VITERBI) {
+ 		unsigned int cnr, const_a, const_b;
+ 
+-		ret = regmap_read(priv->regmap[1], 0x0019, &utmp);
++		ret = cxd2820r_rd_reg(priv, 0x10019, &buf[0]);
+ 		if (ret)
+ 			goto error;
+ 
+-		if (((utmp >> 0) & 0x03) % 2) {
++		if (((buf[0] >> 0) & 0x03) % 2) {
+ 			const_a = 8750;
+ 			const_b = 650;
+ 		} else {
+@@ -222,10 +224,11 @@ int cxd2820r_read_status_c(struct dvb_fr
+ 			const_b = 760;
+ 		}
+ 
+-		ret = regmap_read(priv->regmap[1], 0x004d, &utmp);
++		ret = cxd2820r_rd_reg(priv, 0x1004d, &buf[0]);
+ 		if (ret)
+ 			goto error;
+ 
++		utmp = buf[0] << 0;
+ 		#define CXD2820R_LOG2_E_24 24204406 /* log2(e) << 24 */
+ 		if (utmp)
+ 			cnr = div_u64((u64)(intlog2(const_b) - intlog2(utmp))
+@@ -247,7 +250,7 @@ int cxd2820r_read_status_c(struct dvb_fr
+ 		bool start_ber;
+ 
+ 		if (priv->ber_running) {
+-			ret = regmap_bulk_read(priv->regmap[1], 0x0076, buf, 3);
++			ret = cxd2820r_rd_regs(priv, 0x10076, buf, 3);
+ 			if (ret)
+ 				goto error;
+ 
+@@ -266,7 +269,7 @@ int cxd2820r_read_status_c(struct dvb_fr
+ 		}
+ 
+ 		if (start_ber) {
+-			ret = regmap_write(priv->regmap[1], 0x0079, 0x01);
++			ret = cxd2820r_wr_reg(priv, 0x10079, 0x01);
+ 			if (ret)
+ 				goto error;
+ 			priv->ber_running = true;
+@@ -296,7 +299,7 @@ int cxd2820r_init_c(struct dvb_frontend
+ 
+ 	dev_dbg(&client->dev, "\n");
+ 
+-	ret = regmap_write(priv->regmap[0], 0x0085, 0x07);
++	ret = cxd2820r_wr_reg(priv, 0x00085, 0x07);
+ 	if (ret)
+ 		goto error;
+ 
+@@ -310,7 +313,7 @@ int cxd2820r_sleep_c(struct dvb_frontend
+ {
+ 	struct cxd2820r_priv *priv = fe->demodulator_priv;
+ 	struct i2c_client *client = priv->client[0];
+-	int ret;
++	int ret, i;
+ 	struct reg_val_mask tab[] = {
+ 		{ 0x000ff, 0x1f, 0xff },
+ 		{ 0x00085, 0x00, 0xff },
+@@ -323,9 +326,12 @@ int cxd2820r_sleep_c(struct dvb_frontend
+ 
+ 	priv->delivery_system = SYS_UNDEFINED;
+ 
+-	ret = cxd2820r_wr_reg_val_mask_tab(priv, tab, ARRAY_SIZE(tab));
+-	if (ret)
+-		goto error;
++	for (i = 0; i < ARRAY_SIZE(tab); i++) {
++		ret = cxd2820r_wr_reg_mask(priv, tab[i].reg, tab[i].val,
++			tab[i].mask);
++		if (ret)
++			goto error;
++	}
+ 
+ 	return ret;
+ error:
+diff -Naurp media_build_cc-20170628/linux/drivers/media/dvb-frontends/cxd2820r_core.c media_build_cc-20170628-patch/linux/drivers/media/dvb-frontends/cxd2820r_core.c
+--- media_build_cc-20170628/linux/drivers/media/dvb-frontends/cxd2820r_core.c	2017-06-28 15:11:40.000000000 +0300
++++ media_build_cc-20170628-patch/linux/drivers/media/dvb-frontends/cxd2820r_core.c	2017-08-19 16:21:42.000000000 +0300
+@@ -21,41 +21,170 @@
+ 
+ #include "cxd2820r_priv.h"
+ 
+-/* Write register table */
+-int cxd2820r_wr_reg_val_mask_tab(struct cxd2820r_priv *priv,
+-				 const struct reg_val_mask *tab, int tab_len)
++/* Max transfer size done by I2C transfer functions */
++#define MAX_XFER_SIZE  64
++
++/* write multiple registers */
++static int cxd2820r_wr_regs_i2c(struct cxd2820r_priv *priv, u8 i2c, u8 reg,
++	u8 *val, int len)
+ {
+ 	struct i2c_client *client = priv->client[0];
+ 	int ret;
+-	unsigned int i, reg, mask, val;
+-	struct regmap *regmap;
++	u8 buf[MAX_XFER_SIZE];
++	struct i2c_msg msg[1] = {
++		{
++			.addr = i2c,
++			.flags = 0,
++			.len = len + 1,
++			.buf = buf,
++		}
++	};
+ 
+-	dev_dbg(&client->dev, "tab_len=%d\n", tab_len);
++	if (1 + len > sizeof(buf)) {
++		dev_warn(&client->dev, "i2c wr reg=%04x: len=%d is too big!\n",
++			 reg, len);
++		return -EINVAL;
++	}
+ 
+-	for (i = 0; i < tab_len; i++) {
+-		if ((tab[i].reg >> 16) & 0x1)
+-			regmap = priv->regmap[1];
+-		else
+-			regmap = priv->regmap[0];
++	buf[0] = reg;
++	memcpy(&buf[1], val, len);
++
++	ret = i2c_transfer(priv->client[0]->adapter, msg, 1);
++	if (ret == 1) {
++		ret = 0;
++	} else {
++		dev_warn(&client->dev, "i2c wr failed=%d reg=%02x len=%d\n",
++			 ret, reg, len);
++		ret = -EREMOTEIO;
++	}
++	return ret;
++}
+ 
+-		reg = (tab[i].reg >> 0) & 0xffff;
+-		val = tab[i].val;
+-		mask = tab[i].mask;
++/* read multiple registers */
++static int cxd2820r_rd_regs_i2c(struct cxd2820r_priv *priv, u8 i2c, u8 reg,
++	u8 *val, int len)
++{
++	struct i2c_client *client = priv->client[0];
++	int ret;
++	u8 buf[MAX_XFER_SIZE];
++	struct i2c_msg msg[2] = {
++		{
++			.addr = i2c,
++			.flags = 0,
++			.len = 1,
++			.buf = &reg,
++		}, {
++			.addr = i2c,
++			.flags = I2C_M_RD,
++			.len = len,
++			.buf = buf,
++		}
++	};
+ 
+-		if (mask == 0xff)
+-			ret = regmap_write(regmap, reg, val);
+-		else
+-			ret = regmap_write_bits(regmap, reg, mask, val);
+-		if (ret)
+-			goto error;
++	if (len > sizeof(buf)) {
++		dev_warn(&client->dev, "i2c wr reg=%04x: len=%d is too big!\n",
++			 reg, len);
++		return -EINVAL;
++	}
++
++	ret = i2c_transfer(priv->client[0]->adapter, msg, 2);
++	if (ret == 2) {
++		memcpy(val, buf, len);
++		ret = 0;
++	} else {
++		dev_warn(&client->dev, "i2c rd failed=%d reg=%02x len=%d\n",
++			 ret, reg, len);
++		ret = -EREMOTEIO;
+ 	}
+ 
+-	return 0;
+-error:
+-	dev_dbg(&client->dev, "failed=%d\n", ret);
+ 	return ret;
+ }
+ 
++/* write multiple registers */
++int cxd2820r_wr_regs(struct cxd2820r_priv *priv, u32 reginfo, u8 *val,
++	int len)
++{
++	int ret;
++	u8 i2c_addr;
++	u8 reg = (reginfo >> 0) & 0xff;
++	u8 bank = (reginfo >> 8) & 0xff;
++	u8 i2c = (reginfo >> 16) & 0x01;
++
++	/* select I2C */
++	if (i2c)
++		i2c_addr = priv->client[1]->addr; /* DVB-C */
++	else
++		i2c_addr = priv->client[0]->addr; /* DVB-T/T2 */
++
++	/* switch bank if needed */
++	if (bank != priv->bank[i2c]) {
++		ret = cxd2820r_wr_regs_i2c(priv, i2c_addr, 0x00, &bank, 1);
++		if (ret)
++			return ret;
++		priv->bank[i2c] = bank;
++	}
++	return cxd2820r_wr_regs_i2c(priv, i2c_addr, reg, val, len);
++}
++
++/* read multiple registers */
++int cxd2820r_rd_regs(struct cxd2820r_priv *priv, u32 reginfo, u8 *val,
++	int len)
++{
++	int ret;
++	u8 i2c_addr;
++	u8 reg = (reginfo >> 0) & 0xff;
++	u8 bank = (reginfo >> 8) & 0xff;
++	u8 i2c = (reginfo >> 16) & 0x01;
++
++	/* select I2C */
++	if (i2c)
++		i2c_addr = priv->client[1]->addr; /* DVB-C */
++	else
++		i2c_addr = priv->client[0]->addr; /* DVB-T/T2 */
++
++	/* switch bank if needed */
++	if (bank != priv->bank[i2c]) {
++		ret = cxd2820r_wr_regs_i2c(priv, i2c_addr, 0x00, &bank, 1);
++		if (ret)
++			return ret;
++		priv->bank[i2c] = bank;
++	}
++	return cxd2820r_rd_regs_i2c(priv, i2c_addr, reg, val, len);
++}
++
++/* write single register */
++int cxd2820r_wr_reg(struct cxd2820r_priv *priv, u32 reg, u8 val)
++{
++	return cxd2820r_wr_regs(priv, reg, &val, 1);
++}
++
++/* read single register */
++int cxd2820r_rd_reg(struct cxd2820r_priv *priv, u32 reg, u8 *val)
++{
++	return cxd2820r_rd_regs(priv, reg, val, 1);
++}
++
++/* write single register with mask */
++int cxd2820r_wr_reg_mask(struct cxd2820r_priv *priv, u32 reg, u8 val,
++	u8 mask)
++{
++	int ret;
++	u8 tmp;
++
++	/* no need for read if whole reg is written */
++	if (mask != 0xff) {
++		ret = cxd2820r_rd_reg(priv, reg, &tmp);
++		if (ret)
++			return ret;
++
++		val &= mask;
++		tmp &= ~mask;
++		val |= tmp;
++	}
++
++	return cxd2820r_wr_reg(priv, reg, val);
++}
++
+ int cxd2820r_gpio(struct dvb_frontend *fe, u8 *gpio)
+ {
+ 	struct cxd2820r_priv *priv = fe->demodulator_priv;
+@@ -97,12 +226,12 @@ int cxd2820r_gpio(struct dvb_frontend *f
+ 	dev_dbg(&client->dev, "wr gpio=%02x %02x\n", tmp0, tmp1);
+ 
+ 	/* write bits [7:2] */
+-	ret = regmap_update_bits(priv->regmap[0], 0x0089, 0xfc, tmp0);
++	ret = cxd2820r_wr_reg_mask(priv, 0x00089, tmp0, 0xfc);
+ 	if (ret)
+ 		goto error;
+ 
+ 	/* write bits [5:0] */
+-	ret = regmap_update_bits(priv->regmap[0], 0x008e, 0x3f, tmp1);
++	ret = cxd2820r_wr_reg_mask(priv, 0x0008e, tmp1, 0x3f);
+ 	if (ret)
+ 		goto error;
+ 
+@@ -180,10 +309,6 @@ static int cxd2820r_read_status(struct d
+ 		ret = -EINVAL;
+ 		break;
+ 	}
+-
+-	if (priv->set_lock_led)
+-		priv->set_lock_led(fe, *status & FE_HAS_LOCK);
+-
+ 	return ret;
+ }
+ 
+@@ -256,7 +381,7 @@ static int cxd2820r_read_snr(struct dvb_
+ 	dev_dbg(&client->dev, "delivery_system=%d\n", c->delivery_system);
+ 
+ 	if (c->cnr.stat[0].scale == FE_SCALE_DECIBEL)
+-		*snr = div_s64(c->cnr.stat[0].svalue, 250) *  328;
++		*snr = div_s64(c->cnr.stat[0].svalue, 100);
+ 	else
+ 		*snr = 0;
+ 
+@@ -288,9 +413,6 @@ static int cxd2820r_sleep(struct dvb_fro
+ 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
+ 	int ret;
+ 
+-	if (priv->set_lock_led)
+-		priv->set_lock_led(fe, 0);
+-
+ 	dev_dbg(&client->dev, "delivery_system=%d\n", c->delivery_system);
+ 
+ 	switch (c->delivery_system) {
+@@ -422,9 +544,6 @@ static void cxd2820r_release(struct dvb_
+ 
+ 	dev_dbg(&client->dev, "\n");
+ 
+-	if (priv->set_lock_led)
+-		priv->set_lock_led(fe, 0);
+-
+ 	i2c_unregister_device(client);
+ 
+ 	return;
+@@ -437,7 +556,8 @@ static int cxd2820r_i2c_gate_ctrl(struct
+ 
+ 	dev_dbg_ratelimited(&client->dev, "enable=%d\n", enable);
+ 
+-	return regmap_update_bits(priv->regmap[0], 0x00db, 0x01, enable ? 1 : 0);
++	/* Bit 0 of reg 0xdb in bank 0x00 controls I2C repeater */
++	return cxd2820r_wr_reg_mask(priv, 0xdb, enable ? 1 : 0, 0x1);
+ }
+ 
+ #ifdef CONFIG_GPIOLIB
+@@ -546,7 +666,6 @@ struct dvb_frontend *cxd2820r_attach(con
+ 	pdata.ts_clk_inv = config->ts_clock_inv;
+ 	pdata.if_agc_polarity = config->if_agc_polarity;
+ 	pdata.spec_inv = config->spec_inv;
+-	pdata.set_lock_led = config->set_lock_led;
+ 	pdata.gpio_chip_base = &gpio_chip_base;
+ 	pdata.attach_in_use = true;
+ 
+@@ -577,45 +696,7 @@ static int cxd2820r_probe(struct i2c_cli
+ 	struct cxd2820r_platform_data *pdata = client->dev.platform_data;
+ 	struct cxd2820r_priv *priv;
+ 	int ret, *gpio_chip_base;
+-	unsigned int utmp;
+-	static const struct regmap_range_cfg regmap_range_cfg0[] = {
+-		{
+-			.range_min        = 0x0000,
+-			.range_max        = 0x3fff,
+-			.selector_reg     = 0x00,
+-			.selector_mask    = 0xff,
+-			.selector_shift   = 0,
+-			.window_start     = 0x00,
+-			.window_len       = 0x100,
+-		},
+-	};
+-	static const struct regmap_range_cfg regmap_range_cfg1[] = {
+-		{
+-			.range_min        = 0x0000,
+-			.range_max        = 0x01ff,
+-			.selector_reg     = 0x00,
+-			.selector_mask    = 0xff,
+-			.selector_shift   = 0,
+-			.window_start     = 0x00,
+-			.window_len       = 0x100,
+-		},
+-	};
+-	static const struct regmap_config regmap_config0 = {
+-		.reg_bits = 8,
+-		.val_bits = 8,
+-		.max_register = 0x3fff,
+-		.ranges = regmap_range_cfg0,
+-		.num_ranges = ARRAY_SIZE(regmap_range_cfg0),
+-		.cache_type = REGCACHE_NONE,
+-	};
+-	static const struct regmap_config regmap_config1 = {
+-		.reg_bits = 8,
+-		.val_bits = 8,
+-		.max_register = 0x01ff,
+-		.ranges = regmap_range_cfg1,
+-		.num_ranges = ARRAY_SIZE(regmap_range_cfg1),
+-		.cache_type = REGCACHE_NONE,
+-	};
++	u8 u8tmp;
+ 
+ 	dev_dbg(&client->dev, "\n");
+ 
+@@ -626,30 +707,25 @@ static int cxd2820r_probe(struct i2c_cli
+ 	}
+ 
+ 	priv->client[0] = client;
+-	priv->fe.demodulator_priv = priv;
+ 	priv->i2c = client->adapter;
+ 	priv->ts_mode = pdata->ts_mode;
+ 	priv->ts_clk_inv = pdata->ts_clk_inv;
+ 	priv->if_agc_polarity = pdata->if_agc_polarity;
+ 	priv->spec_inv = pdata->spec_inv;
+-	priv->set_lock_led = pdata->set_lock_led;
++	priv->bank[0] = 0xff;
++	priv->bank[1] = 0xff;
+ 	gpio_chip_base = *pdata->gpio_chip_base;
+-	priv->regmap[0] = regmap_init_i2c(priv->client[0], &regmap_config0);
+-	if (IS_ERR(priv->regmap[0])) {
+-		ret = PTR_ERR(priv->regmap[0]);
+-		goto err_kfree;
+-	}
+ 
+ 	/* Check demod answers with correct chip id */
+-	ret = regmap_read(priv->regmap[0], 0x00fd, &utmp);
++	ret = cxd2820r_rd_reg(priv, 0x000fd, &u8tmp);
+ 	if (ret)
+-		goto err_regmap_0_regmap_exit;
++		goto err_kfree;
+ 
+-	dev_dbg(&client->dev, "chip_id=%02x\n", utmp);
++	dev_dbg(&client->dev, "chip_id=%02x\n", u8tmp);
+ 
+-	if (utmp != 0xe1) {
++	if (u8tmp != 0xe1) {
+ 		ret = -ENODEV;
+-		goto err_regmap_0_regmap_exit;
++		goto err_kfree;
+ 	}
+ 
+ 	/*
+@@ -662,13 +738,7 @@ static int cxd2820r_probe(struct i2c_cli
+ 		ret = -ENODEV;
+ 		dev_err(&client->dev, "I2C registration failed\n");
+ 		if (ret)
+-			goto err_regmap_0_regmap_exit;
+-	}
+-
+-	priv->regmap[1] = regmap_init_i2c(priv->client[1], &regmap_config1);
+-	if (IS_ERR(priv->regmap[1])) {
+-		ret = PTR_ERR(priv->regmap[1]);
+-		goto err_client_1_i2c_unregister_device;
++			goto err_kfree;
+ 	}
+ 
+ 	if (gpio_chip_base) {
+@@ -685,7 +755,7 @@ static int cxd2820r_probe(struct i2c_cli
+ 		priv->gpio_chip.can_sleep = 1;
+ 		ret = gpiochip_add_data(&priv->gpio_chip, priv);
+ 		if (ret)
+-			goto err_regmap_1_regmap_exit;
++			goto err_client_1_i2c_unregister_device;
+ 
+ 		dev_dbg(&client->dev, "gpio_chip.base=%d\n",
+ 			priv->gpio_chip.base);
+@@ -702,7 +772,7 @@ static int cxd2820r_probe(struct i2c_cli
+ 		gpio[2] = 0;
+ 		ret = cxd2820r_gpio(&priv->fe, gpio);
+ 		if (ret)
+-			goto err_regmap_1_regmap_exit;
++			goto err_client_1_i2c_unregister_device;
+ #endif
+ 	}
+ 
+@@ -710,6 +780,7 @@ static int cxd2820r_probe(struct i2c_cli
+ 	memcpy(&priv->fe.ops, &cxd2820r_ops, sizeof(priv->fe.ops));
+ 	if (!pdata->attach_in_use)
+ 		priv->fe.ops.release = NULL;
++	priv->fe.demodulator_priv = priv;
+ 	i2c_set_clientdata(client, priv);
+ 
+ 	/* Setup callbacks */
+@@ -718,12 +789,8 @@ static int cxd2820r_probe(struct i2c_cli
+ 	dev_info(&client->dev, "Sony CXD2820R successfully identified\n");
+ 
+ 	return 0;
+-err_regmap_1_regmap_exit:
+-	regmap_exit(priv->regmap[1]);
+ err_client_1_i2c_unregister_device:
+ 	i2c_unregister_device(priv->client[1]);
+-err_regmap_0_regmap_exit:
+-	regmap_exit(priv->regmap[0]);
+ err_kfree:
+ 	kfree(priv);
+ err:
+@@ -741,11 +808,7 @@ static int cxd2820r_remove(struct i2c_cl
+ 	if (priv->gpio_chip.label)
+ 		gpiochip_remove(&priv->gpio_chip);
+ #endif
+-	regmap_exit(priv->regmap[1]);
+ 	i2c_unregister_device(priv->client[1]);
+-
+-	regmap_exit(priv->regmap[0]);
+-
+ 	kfree(priv);
+ 
+ 	return 0;
+diff -Naurp media_build_cc-20170628/linux/drivers/media/dvb-frontends/cxd2820r_priv.h media_build_cc-20170628-patch/linux/drivers/media/dvb-frontends/cxd2820r_priv.h
+--- media_build_cc-20170628/linux/drivers/media/dvb-frontends/cxd2820r_priv.h	2017-06-28 15:11:40.000000000 +0300
++++ media_build_cc-20170628-patch/linux/drivers/media/dvb-frontends/cxd2820r_priv.h	2017-08-19 16:21:56.000000000 +0300
+@@ -28,7 +28,6 @@
+ #include "cxd2820r.h"
+ #include <linux/gpio.h>
+ #include <linux/math64.h>
+-#include <linux/regmap.h>
+ 
+ struct reg_val_mask {
+ 	u32 reg;
+@@ -40,20 +39,19 @@ struct reg_val_mask {
+ 
+ struct cxd2820r_priv {
+ 	struct i2c_client *client[2];
+-	struct regmap *regmap[2];
+ 	struct i2c_adapter *i2c;
+ 	struct dvb_frontend fe;
+ 	u8 ts_mode;
+ 	bool ts_clk_inv;
+ 	bool if_agc_polarity;
+ 	bool spec_inv;
+-	void (*set_lock_led)(struct dvb_frontend *fe, int offon);
+ 
+ 	u64 post_bit_error_prev_dvbv3;
+ 	u64 post_bit_error;
+ 
+ 	bool ber_running;
+ 
++	u8 bank[2];
+ #define GPIO_COUNT 3
+ 	u8 gpio[GPIO_COUNT];
+ #ifdef CONFIG_GPIOLIB
+@@ -70,9 +68,6 @@ extern int cxd2820r_debug;
+ 
+ int cxd2820r_gpio(struct dvb_frontend *fe, u8 *gpio);
+ 
+-int cxd2820r_wr_reg_val_mask_tab(struct cxd2820r_priv *priv,
+-				 const struct reg_val_mask *tab, int tab_len);
+-
+ int cxd2820r_wr_reg_mask(struct cxd2820r_priv *priv, u32 reg, u8 val,
+ 	u8 mask);
+ 
+diff -Naurp media_build_cc-20170628/linux/drivers/media/dvb-frontends/cxd2820r_t2.c media_build_cc-20170628-patch/linux/drivers/media/dvb-frontends/cxd2820r_t2.c
+--- media_build_cc-20170628/linux/drivers/media/dvb-frontends/cxd2820r_t2.c	2017-06-28 15:11:40.000000000 +0300
++++ media_build_cc-20170628-patch/linux/drivers/media/dvb-frontends/cxd2820r_t2.c	2017-08-19 16:22:24.000000000 +0300
+@@ -26,7 +26,7 @@ int cxd2820r_set_frontend_t2(struct dvb_
+ 	struct cxd2820r_priv *priv = fe->demodulator_priv;
+ 	struct i2c_client *client = priv->client[0];
+ 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
+-	int ret, bw_i;
++	int ret, i, bw_i;
+ 	unsigned int utmp;
+ 	u32 if_frequency;
+ 	u8 buf[3], bw_param;
+@@ -101,9 +101,12 @@ int cxd2820r_set_frontend_t2(struct dvb_
+ 		fe->ops.tuner_ops.set_params(fe);
+ 
+ 	if (priv->delivery_system != SYS_DVBT2) {
+-		ret = cxd2820r_wr_reg_val_mask_tab(priv, tab, ARRAY_SIZE(tab));
+-		if (ret)
+-			goto error;
++		for (i = 0; i < ARRAY_SIZE(tab); i++) {
++			ret = cxd2820r_wr_reg_mask(priv, tab[i].reg,
++				tab[i].val, tab[i].mask);
++			if (ret)
++				goto error;
++		}
+ 	}
+ 
+ 	priv->delivery_system = SYS_DVBT2;
+@@ -123,39 +126,39 @@ int cxd2820r_set_frontend_t2(struct dvb_
+ 	buf[0] = (utmp >> 16) & 0xff;
+ 	buf[1] = (utmp >>  8) & 0xff;
+ 	buf[2] = (utmp >>  0) & 0xff;
+-	ret = regmap_bulk_write(priv->regmap[0], 0x20b6, buf, 3);
++	ret = cxd2820r_wr_regs(priv, 0x020b6, buf, 3);
+ 	if (ret)
+ 		goto error;
+ 
+ 	/* PLP filtering */
+ 	if (c->stream_id > 255) {
+ 		dev_dbg(&client->dev, "disable PLP filtering\n");
+-		ret = regmap_write(priv->regmap[0], 0x23ad, 0x00);
++		ret = cxd2820r_wr_reg(priv, 0x023ad , 0);
+ 		if (ret)
+ 			goto error;
+ 	} else {
+ 		dev_dbg(&client->dev, "enable PLP filtering\n");
+-		ret = regmap_write(priv->regmap[0], 0x23af, c->stream_id & 0xff);
++		ret = cxd2820r_wr_reg(priv, 0x023af , c->stream_id & 0xFF);
+ 		if (ret)
+ 			goto error;
+-		ret = regmap_write(priv->regmap[0], 0x23ad, 0x01);
++		ret = cxd2820r_wr_reg(priv, 0x023ad , 1);
+ 		if (ret)
+ 			goto error;
+ 	}
+ 
+-	ret = regmap_bulk_write(priv->regmap[0], 0x209f, bw_params1[bw_i], 5);
++	ret = cxd2820r_wr_regs(priv, 0x0209f, bw_params1[bw_i], 5);
+ 	if (ret)
+ 		goto error;
+ 
+-	ret = regmap_update_bits(priv->regmap[0], 0x20d7, 0xc0, bw_param << 6);
++	ret = cxd2820r_wr_reg_mask(priv, 0x020d7, bw_param << 6, 0xc0);
+ 	if (ret)
+ 		goto error;
+ 
+-	ret = regmap_write(priv->regmap[0], 0x00ff, 0x08);
++	ret = cxd2820r_wr_reg(priv, 0x000ff, 0x08);
+ 	if (ret)
+ 		goto error;
+ 
+-	ret = regmap_write(priv->regmap[0], 0x00fe, 0x01);
++	ret = cxd2820r_wr_reg(priv, 0x000fe, 0x01);
+ 	if (ret)
+ 		goto error;
+ 
+@@ -172,12 +175,11 @@ int cxd2820r_get_frontend_t2(struct dvb_
+ 	struct cxd2820r_priv *priv = fe->demodulator_priv;
+ 	struct i2c_client *client = priv->client[0];
+ 	int ret;
+-	unsigned int utmp;
+ 	u8 buf[2];
+ 
+ 	dev_dbg(&client->dev, "\n");
+ 
+-	ret = regmap_bulk_read(priv->regmap[0], 0x205c, buf, 2);
++	ret = cxd2820r_rd_regs(priv, 0x0205c, buf, 2);
+ 	if (ret)
+ 		goto error;
+ 
+@@ -226,7 +228,7 @@ int cxd2820r_get_frontend_t2(struct dvb_
+ 		break;
+ 	}
+ 
+-	ret = regmap_bulk_read(priv->regmap[0], 0x225b, buf, 2);
++	ret = cxd2820r_rd_regs(priv, 0x0225b, buf, 2);
+ 	if (ret)
+ 		goto error;
+ 
+@@ -266,11 +268,11 @@ int cxd2820r_get_frontend_t2(struct dvb_
+ 		break;
+ 	}
+ 
+-	ret = regmap_read(priv->regmap[0], 0x20b5, &utmp);
++	ret = cxd2820r_rd_reg(priv, 0x020b5, &buf[0]);
+ 	if (ret)
+ 		goto error;
+ 
+-	switch ((utmp >> 4) & 0x01) {
++	switch ((buf[0] >> 4) & 0x01) {
+ 	case 0:
+ 		c->inversion = INVERSION_OFF;
+ 		break;
+@@ -295,7 +297,7 @@ int cxd2820r_read_status_t2(struct dvb_f
+ 	u8 buf[4];
+ 
+ 	/* Lock detection */
+-	ret = regmap_bulk_read(priv->regmap[0], 0x2010, &buf[0], 1);
++	ret = cxd2820r_rd_reg(priv, 0x02010 , &buf[0]);
+ 	if (ret)
+ 		goto error;
+ 
+@@ -319,7 +321,7 @@ int cxd2820r_read_status_t2(struct dvb_f
+ 	if (*status & FE_HAS_SIGNAL) {
+ 		unsigned int strength;
+ 
+-		ret = regmap_bulk_read(priv->regmap[0], 0x2026, buf, 2);
++		ret = cxd2820r_rd_regs(priv, 0x02026, buf, 2);
+ 		if (ret)
+ 			goto error;
+ 
+@@ -340,7 +342,7 @@ int cxd2820r_read_status_t2(struct dvb_f
+ 	if (*status & FE_HAS_VITERBI) {
+ 		unsigned int cnr;
+ 
+-		ret = regmap_bulk_read(priv->regmap[0], 0x2028, buf, 2);
++		ret = cxd2820r_rd_regs(priv, 0x02028, buf, 2);
+ 		if (ret)
+ 			goto error;
+ 
+@@ -366,7 +368,7 @@ int cxd2820r_read_status_t2(struct dvb_f
+ 	if (*status & FE_HAS_SYNC) {
+ 		unsigned int post_bit_error;
+ 
+-		ret = regmap_bulk_read(priv->regmap[0], 0x2039, buf, 4);
++		ret = cxd2820r_rd_regs(priv, 0x02039, buf, 4);
+ 		if (ret)
+ 			goto error;
+ 
+@@ -398,7 +400,7 @@ int cxd2820r_sleep_t2(struct dvb_fronten
+ {
+ 	struct cxd2820r_priv *priv = fe->demodulator_priv;
+ 	struct i2c_client *client = priv->client[0];
+-	int ret;
++	int ret, i;
+ 	struct reg_val_mask tab[] = {
+ 		{ 0x000ff, 0x1f, 0xff },
+ 		{ 0x00085, 0x00, 0xff },
+@@ -410,9 +412,12 @@ int cxd2820r_sleep_t2(struct dvb_fronten
+ 
+ 	dev_dbg(&client->dev, "\n");
+ 
+-	ret = cxd2820r_wr_reg_val_mask_tab(priv, tab, ARRAY_SIZE(tab));
+-	if (ret)
+-		goto error;
++	for (i = 0; i < ARRAY_SIZE(tab); i++) {
++		ret = cxd2820r_wr_reg_mask(priv, tab[i].reg, tab[i].val,
++			tab[i].mask);
++		if (ret)
++			goto error;
++	}
+ 
+ 	priv->delivery_system = SYS_UNDEFINED;
+ 
+diff -Naurp media_build_cc-20170628/linux/drivers/media/dvb-frontends/cxd2820r_t.c media_build_cc-20170628-patch/linux/drivers/media/dvb-frontends/cxd2820r_t.c
+--- media_build_cc-20170628/linux/drivers/media/dvb-frontends/cxd2820r_t.c	2017-06-28 15:11:40.000000000 +0300
++++ media_build_cc-20170628-patch/linux/drivers/media/dvb-frontends/cxd2820r_t.c	2017-08-19 16:22:09.000000000 +0300
+@@ -26,7 +26,7 @@ int cxd2820r_set_frontend_t(struct dvb_f
+ 	struct cxd2820r_priv *priv = fe->demodulator_priv;
+ 	struct i2c_client *client = priv->client[0];
+ 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
+-	int ret, bw_i;
++	int ret, i, bw_i;
+ 	unsigned int utmp;
+ 	u32 if_frequency;
+ 	u8 buf[3], bw_param;
+@@ -83,9 +83,12 @@ int cxd2820r_set_frontend_t(struct dvb_f
+ 		fe->ops.tuner_ops.set_params(fe);
+ 
+ 	if (priv->delivery_system != SYS_DVBT) {
+-		ret = cxd2820r_wr_reg_val_mask_tab(priv, tab, ARRAY_SIZE(tab));
+-		if (ret)
+-			goto error;
++		for (i = 0; i < ARRAY_SIZE(tab); i++) {
++			ret = cxd2820r_wr_reg_mask(priv, tab[i].reg,
++				tab[i].val, tab[i].mask);
++			if (ret)
++				goto error;
++		}
+ 	}
+ 
+ 	priv->delivery_system = SYS_DVBT;
+@@ -106,27 +109,27 @@ int cxd2820r_set_frontend_t(struct dvb_f
+ 	buf[0] = (utmp >> 16) & 0xff;
+ 	buf[1] = (utmp >>  8) & 0xff;
+ 	buf[2] = (utmp >>  0) & 0xff;
+-	ret = regmap_bulk_write(priv->regmap[0], 0x00b6, buf, 3);
++	ret = cxd2820r_wr_regs(priv, 0x000b6, buf, 3);
+ 	if (ret)
+ 		goto error;
+ 
+-	ret = regmap_bulk_write(priv->regmap[0], 0x009f, bw_params1[bw_i], 5);
++	ret = cxd2820r_wr_regs(priv, 0x0009f, bw_params1[bw_i], 5);
+ 	if (ret)
+ 		goto error;
+ 
+-	ret = regmap_update_bits(priv->regmap[0], 0x00d7, 0xc0, bw_param << 6);
++	ret = cxd2820r_wr_reg_mask(priv, 0x000d7, bw_param << 6, 0xc0);
+ 	if (ret)
+ 		goto error;
+ 
+-	ret = regmap_bulk_write(priv->regmap[0], 0x00d9, bw_params2[bw_i], 2);
++	ret = cxd2820r_wr_regs(priv, 0x000d9, bw_params2[bw_i], 2);
+ 	if (ret)
+ 		goto error;
+ 
+-	ret = regmap_write(priv->regmap[0], 0x00ff, 0x08);
++	ret = cxd2820r_wr_reg(priv, 0x000ff, 0x08);
+ 	if (ret)
+ 		goto error;
+ 
+-	ret = regmap_write(priv->regmap[0], 0x00fe, 0x01);
++	ret = cxd2820r_wr_reg(priv, 0x000fe, 0x01);
+ 	if (ret)
+ 		goto error;
+ 
+@@ -142,12 +145,11 @@ int cxd2820r_get_frontend_t(struct dvb_f
+ 	struct cxd2820r_priv *priv = fe->demodulator_priv;
+ 	struct i2c_client *client = priv->client[0];
+ 	int ret;
+-	unsigned int utmp;
+ 	u8 buf[2];
+ 
+ 	dev_dbg(&client->dev, "\n");
+ 
+-	ret = regmap_bulk_read(priv->regmap[0], 0x002f, buf, sizeof(buf));
++	ret = cxd2820r_rd_regs(priv, 0x0002f, buf, sizeof(buf));
+ 	if (ret)
+ 		goto error;
+ 
+@@ -238,11 +240,11 @@ int cxd2820r_get_frontend_t(struct dvb_f
+ 		break;
+ 	}
+ 
+-	ret = regmap_read(priv->regmap[0], 0x07c6, &utmp);
++	ret = cxd2820r_rd_reg(priv, 0x007c6, &buf[0]);
+ 	if (ret)
+ 		goto error;
+ 
+-	switch ((utmp >> 0) & 0x01) {
++	switch ((buf[0] >> 0) & 0x01) {
+ 	case 0:
+ 		c->inversion = INVERSION_OFF;
+ 		break;
+@@ -267,10 +269,10 @@ int cxd2820r_read_status_t(struct dvb_fr
+ 	u8 buf[3];
+ 
+ 	/* Lock detection */
+-	ret = regmap_bulk_read(priv->regmap[0], 0x0010, &buf[0], 1);
++	ret = cxd2820r_rd_reg(priv, 0x00010, &buf[0]);
+ 	if (ret)
+ 		goto error;
+-	ret = regmap_bulk_read(priv->regmap[0], 0x0073, &buf[1], 1);
++	ret = cxd2820r_rd_reg(priv, 0x00073, &buf[1]);
+ 	if (ret)
+ 		goto error;
+ 
+@@ -294,7 +296,7 @@ int cxd2820r_read_status_t(struct dvb_fr
+ 	if (*status & FE_HAS_SIGNAL) {
+ 		unsigned int strength;
+ 
+-		ret = regmap_bulk_read(priv->regmap[0], 0x0026, buf, 2);
++		ret = cxd2820r_rd_regs(priv, 0x00026, buf, 2);
+ 		if (ret)
+ 			goto error;
+ 
+@@ -315,7 +317,7 @@ int cxd2820r_read_status_t(struct dvb_fr
+ 	if (*status & FE_HAS_VITERBI) {
+ 		unsigned int cnr;
+ 
+-		ret = regmap_bulk_read(priv->regmap[0], 0x002c, buf, 2);
++		ret = cxd2820r_rd_regs(priv, 0x0002c, buf, 2);
+ 		if (ret)
+ 			goto error;
+ 
+@@ -341,7 +343,7 @@ int cxd2820r_read_status_t(struct dvb_fr
+ 		bool start_ber;
+ 
+ 		if (priv->ber_running) {
+-			ret = regmap_bulk_read(priv->regmap[0], 0x0076, buf, 3);
++			ret = cxd2820r_rd_regs(priv, 0x00076, buf, 3);
+ 			if (ret)
+ 				goto error;
+ 
+@@ -360,7 +362,7 @@ int cxd2820r_read_status_t(struct dvb_fr
+ 		}
+ 
+ 		if (start_ber) {
+-			ret = regmap_write(priv->regmap[0], 0x0079, 0x01);
++			ret = cxd2820r_wr_reg(priv, 0x00079, 0x01);
+ 			if (ret)
+ 				goto error;
+ 			priv->ber_running = true;
+@@ -390,7 +392,7 @@ int cxd2820r_init_t(struct dvb_frontend
+ 
+ 	dev_dbg(&client->dev, "\n");
+ 
+-	ret = regmap_write(priv->regmap[0], 0x0085, 0x07);
++	ret = cxd2820r_wr_reg(priv, 0x00085, 0x07);
+ 	if (ret)
+ 		goto error;
+ 
+@@ -404,7 +406,7 @@ int cxd2820r_sleep_t(struct dvb_frontend
+ {
+ 	struct cxd2820r_priv *priv = fe->demodulator_priv;
+ 	struct i2c_client *client = priv->client[0];
+-	int ret;
++	int ret, i;
+ 	struct reg_val_mask tab[] = {
+ 		{ 0x000ff, 0x1f, 0xff },
+ 		{ 0x00085, 0x00, 0xff },
+@@ -417,9 +419,12 @@ int cxd2820r_sleep_t(struct dvb_frontend
+ 
+ 	priv->delivery_system = SYS_UNDEFINED;
+ 
+-	ret = cxd2820r_wr_reg_val_mask_tab(priv, tab, ARRAY_SIZE(tab));
+-	if (ret)
+-		goto error;
++	for (i = 0; i < ARRAY_SIZE(tab); i++) {
++		ret = cxd2820r_wr_reg_mask(priv, tab[i].reg, tab[i].val,
++			tab[i].mask);
++		if (ret)
++			goto error;
++	}
+ 
+ 	return ret;
+ error:
+diff -Naurp media_build_cc-20170628/linux/drivers/media/dvb-frontends/Kconfig media_build_cc-20170628-patch/linux/drivers/media/dvb-frontends/Kconfig
+--- media_build_cc-20170628/linux/drivers/media/dvb-frontends/Kconfig	2017-06-28 15:11:40.000000000 +0300
++++ media_build_cc-20170628-patch/linux/drivers/media/dvb-frontends/Kconfig	2017-08-19 16:18:02.000000000 +0300
+@@ -464,7 +464,6 @@ config DVB_STV0367
+ config DVB_CXD2820R
+ 	tristate "Sony CXD2820R"
+ 	depends on DVB_CORE && I2C
+-	select REGMAP_I2C
+ 	default m if !MEDIA_SUBDRV_AUTOSELECT
+ 	help
+ 	  Say Y when you want to support this frontend.

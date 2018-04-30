@@ -1,0 +1,66 @@
+diff -Naurp kodi-17.5-rc1-857c640/addons/resource.language.en_gb/resources/strings.po kodi-17.5-rc1-857c640-patch/addons/resource.language.en_gb/resources/strings.po
+--- kodi-17.5-rc1-857c640/addons/resource.language.en_gb/resources/strings.po	2017-10-14 07:50:45.000000000 +0300
++++ kodi-17.5-rc1-857c640-patch/addons/resource.language.en_gb/resources/strings.po	2017-10-14 08:43:34.000000000 +0300
+@@ -5603,7 +5603,7 @@ msgstr ""
+ #: system/peripherals.xml
+ #: addons/skin.estuary/1080i/DialogButtonMenu.xml
+ msgctxt "#13011"
+-msgid "Suspend"
++msgid "TVIP"
+ msgstr ""
+ 
+ #: addons/skin.estuary/1080i/DialogButtonMenu.xml
+diff -Naurp kodi-17.5-rc1-857c640/xbmc/Application.cpp kodi-17.5-rc1-857c640-patch/xbmc/Application.cpp
+--- kodi-17.5-rc1-857c640/xbmc/Application.cpp	2017-10-14 07:50:45.000000000 +0300
++++ kodi-17.5-rc1-857c640-patch/xbmc/Application.cpp	2017-10-14 08:53:10.000000000 +0300
+@@ -2449,7 +2449,8 @@ void CApplication::OnApplicationMessage(
+     break;
+ 
+   case TMSG_SUSPEND:
+-    g_powerManager.Suspend();
++    SetExitCode(EXITCODE_TVIP);
++    Stop(EXITCODE_TVIP);
+     break;
+ 
+   case TMSG_RESTART:
+@@ -3014,16 +3015,24 @@ void CApplication::Stop(int exitCode)
+ 
+   cleanup_emu_environ();
+ 
+-  // start Games & switch to Android
+-  if (m_ExitCode == EXITCODE_SWITCH)
++  // start TVIP, Games & switch to Android
++  switch (m_ExitCode)
+   {
++  case EXITCODE_SWITCH:
+     system("/usr/sbin/nand-reboot");
+-  }
+-  else if (m_ExitCode == EXITCODE_GAMES)
+-  {
++    break;
++
++  case EXITCODE_GAMES:
+     remove("/var/lock/start.kodi");
+     creat("/var/lock/start.games", S_IRUSR|S_IROTH);
+     system("systemctl start emustation.service");
++    break;
++  
++  case EXITCODE_TVIP:
++    remove("/var/lock/start.kodi");
++    creat("/var/lock/start.tvip", S_IRUSR|S_IROTH);
++    system("systemctl start tvip.service");
++    break;
+   }
+ 
+   Sleep(200);
+diff -Naurp kodi-17.5-rc1-857c640/xbmc/XBApplicationEx.h kodi-17.5-rc1-857c640-patch/xbmc/XBApplicationEx.h
+--- kodi-17.5-rc1-857c640/xbmc/XBApplicationEx.h	2017-10-14 07:50:45.000000000 +0300
++++ kodi-17.5-rc1-857c640-patch/xbmc/XBApplicationEx.h	2017-10-14 08:44:31.000000000 +0300
+@@ -33,6 +33,7 @@ enum {
+   EXITCODE_REBOOT    = 66,
+   EXITCODE_GAMES     = 67,
+   EXITCODE_SWITCH    = 68,
++  EXITCODE_TVIP      = 69,
+ };
+ 
+ class CXBApplicationEx : public IWindowManagerCallback

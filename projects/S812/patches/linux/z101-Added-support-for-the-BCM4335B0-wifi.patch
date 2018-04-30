@@ -1,0 +1,34 @@
+diff -Naurp linux-fb5b898/drivers/amlogic/wifi/bcmdhd/dhd_config.c linux-fb5b898-patch/drivers/amlogic/wifi/bcmdhd/dhd_config.c
+--- linux-fb5b898/drivers/amlogic/wifi/bcmdhd/dhd_config.c	2016-12-15 18:49:08.000000000 +0200
++++ linux-fb5b898-patch/drivers/amlogic/wifi/bcmdhd/dhd_config.c	2017-03-08 11:13:53.000000000 +0200
+@@ -57,6 +57,7 @@ uint config_msg_level = CONFIG_ERROR_LEV
+ #define BCM43341B0_CHIP_REV     2
+ #define BCM43241B4_CHIP_REV     5
+ #define BCM4335A0_CHIP_REV      2
++#define BCM4335B0_CHIP_REV      1
+ #define BCM4339A0_CHIP_REV      1
+ #define BCM43455C0_CHIP_REV     6
+ #define BCM4354A1_CHIP_REV      1
+@@ -118,6 +119,13 @@ const static char *bcm43241b4_ag_fw_name
+ 	"fw_bcm43241b4_ag_mfg.bin"
+ };
+ 
++const static char *bcm4335b0_ag_fw_name[] = {
++	"fw_bcm4335b0_ag.bin",
++	"fw_bcm4335b0_ag_apsta.bin",
++	"fw_bcm4335b0_ag_p2p.bin",
++	"fw_bcm4335b0_ag_mfg.bin"
++};
++
+ const static char *bcm4339a0_ag_fw_name[] = {
+ 	"fw_bcm4339a0_ag.bin",
+ 	"fw_bcm4339a0_ag_apsta.bin",
+@@ -485,6 +493,8 @@ dhd_conf_set_fw_name_by_chip(dhd_pub_t *
+ 		case BCM4335_CHIP_ID:
+ 			if (chiprev == BCM4335A0_CHIP_REV)
+ 				strcpy(&fw_path[i+1], bcm4339a0_ag_fw_name[fw_type]);
++			else if (chiprev == BCM4335B0_CHIP_REV)
++				strcpy(&fw_path[i+1], bcm4335b0_ag_fw_name[fw_type]);
+ 			break;
+ 		case BCM4345_CHIP_ID:
+ 			if (chiprev == BCM43455C0_CHIP_REV)

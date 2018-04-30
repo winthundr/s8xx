@@ -1,0 +1,12 @@
+diff -Naurp vdr-plugin-iptv-0fe1cb7/Makefile vdr-plugin-iptv-0fe1cb7-patch/Makefile
+--- vdr-plugin-iptv-0fe1cb7/Makefile	2017-06-24 23:20:33.000000000 +0300
++++ vdr-plugin-iptv-0fe1cb7-patch/Makefile	2017-07-03 20:20:53.000000000 +0300
+@@ -54,7 +54,7 @@ SOFILE = libvdr-$(PLUGIN).so
+ 
+ ### Libraries
+ 
+-LIBS = $(shell curl-config --libs)
++LIBS = $(shell pkg-config --libs libcurl)
+ 
+ ### Includes and Defines (add further entries here):
+ 

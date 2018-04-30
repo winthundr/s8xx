@@ -1,0 +1,264 @@
+diff -Naurp vdr-2.3.8/channels.c vdr-2.3.8-patch/channels.c
+--- vdr-2.3.8/channels.c	2017-06-10 18:08:56.000000000 +0300
++++ vdr-2.3.8-patch/channels.c	2017-07-04 20:17:52.000000000 +0300
+@@ -146,7 +146,8 @@ int cChannel::Transponder(int Frequency,
+ int cChannel::Transponder(void) const
+ {
+   int tf = frequency;
+-  while (tf > 20000)
++  if(IsSat() || IsAtsc() || IsCable() || IsTerr())
++     while (tf > 20000)
+         tf /= 1000;
+   if (IsSat()) {
+      const char *p = strpbrk(parameters, "HVLRhvlr"); // lowercase for backwards compatibility
+@@ -867,12 +868,13 @@ void cChannels::DeleteDuplicateChannels(
+   cChannelSorter *cs = ChannelSorter.First();
+   while (cs) {
+         cChannelSorter *Next = ChannelSorter.Next(cs);
+-        if (Next && cs->channelID == Next->channelID) {
+-           dsyslog("deleting duplicate channel %s", *Next->channel->ToText());
++        if (Next && cs->channelID == Next->channelID && cs->channel->Transponder() == Next->channel->Transponder() && !strcmp(cs->channel->Parameters(), Next->channel->Parameters())) {
++           dsyslog("deleting duplicate channel: %s", *Next->channel->ToText());
+            Del(Next->channel);
+            }
+         cs = Next;
+         }
++  channels.Save();
+ }
+ 
+ bool cChannels::Load(const char *FileName, bool AllowComments, bool MustExist)
+@@ -1096,11 +1098,11 @@ cChannel *cChannels::NewChannel(const cC
+ #define CHANNELMARKOBSOLETE "OBSOLETE"
+ #define CHANNELTIMEOBSOLETE 3600 // seconds to wait before declaring a channel obsolete (in case it has actually been seen before)
+ 
+-bool cChannels::MarkObsoleteChannels(int Source, int Nid, int Tid)
++bool cChannels::MarkObsoleteChannels(int Source, int Nid, int Tid, int Transponder)
+ {
+   bool ChannelsModified = false;
+   for (cChannel *Channel = First(); Channel; Channel = Next(Channel)) {
+-      if (time(NULL) - Channel->Seen() > CHANNELTIMEOBSOLETE && Channel->Source() == Source && Channel->Nid() == Nid && Channel->Tid() == Tid && Channel->Rid() == 0) {
++      if (time(NULL) - Channel->Seen() > CHANNELTIMEOBSOLETE && Channel->Source() == Source && Channel->Nid() == Nid && Channel->Tid() == Tid && Channel->Transponder() == Transponder && Channel->Rid() == 0) {
+          int OldShowChannelNamesWithSource = Setup.ShowChannelNamesWithSource;
+          Setup.ShowChannelNamesWithSource = 0;
+          if (!endswith(Channel->Name(), CHANNELMARKOBSOLETE))
+diff -Naurp vdr-2.3.8/channels.h vdr-2.3.8-patch/channels.h
+--- vdr-2.3.8/channels.h	2017-06-10 18:06:40.000000000 +0300
++++ vdr-2.3.8-patch/channels.h	2017-07-04 20:18:12.000000000 +0300
+@@ -251,7 +251,7 @@ public:
+       ///< and will be set to the current value of the list's internal state variable upon
+       ///< return from this function.
+   cChannel *NewChannel(const cChannel *Transponder, const char *Name, const char *ShortName, const char *Provider, int Nid, int Tid, int Sid, int Rid = 0);
+-  bool MarkObsoleteChannels(int Source, int Nid, int Tid);
++  bool MarkObsoleteChannels(int Source, int Nid, int Tid, int Transponder);
+   };
+ 
+ // Provide lock controlled access to the list:
+diff -Naurp vdr-2.3.8/epg.c vdr-2.3.8-patch/epg.c
+--- vdr-2.3.8/epg.c	2017-07-04 20:08:52.000000000 +0300
++++ vdr-2.3.8-patch/epg.c	2017-07-04 20:27:55.000000000 +0300
+@@ -906,9 +906,10 @@ Final:
+ 
+ cMutex cSchedule::numTimersMutex;
+ 
+-cSchedule::cSchedule(tChannelID ChannelID)
++cSchedule::cSchedule(tChannelID ChannelID, char *Name)
+ {
+   channelID = ChannelID;
++  name = Name;
+   events.SetUseGarbageCollector();
+   numTimers = 0;
+   hasRunning = false;
+@@ -1147,12 +1148,13 @@ bool cSchedule::Read(FILE *f, cSchedules
+            if (*s == 'C') {
+               s = skipspace(s + 1);
+               char *p = strchr(s, ' ');
++              char *name = strchr(s, ' ')+1;
+               if (p)
+                  *p = 0; // strips optional channel name
+               if (*s) {
+                  tChannelID channelID = tChannelID::FromString(s);
+-                 if (channelID.Valid()) {
+-                    if (cSchedule *p = Schedules->AddSchedule(channelID)) {
++                 if (channelID.Valid() || (channelID.Sid() && *s == 'P')) {
++                    if (cSchedule *p = Schedules->AddSchedule(channelID, name)) {
+                        if (!cEvent::Read(f, p, Line))
+                           return false;
+                        p->Sort();
+@@ -1317,24 +1319,30 @@ bool cSchedules::Read(FILE *f)
+   return result;
+ }
+ 
+-cSchedule *cSchedules::AddSchedule(tChannelID ChannelID)
++cSchedule *cSchedules::AddSchedule(tChannelID ChannelID, char *name)
+ {
+   ChannelID.ClrRid();
+-  cSchedule *p = (cSchedule *)GetSchedule(ChannelID);
++  cSchedule *p = (cSchedule *)GetSchedule(ChannelID, name);
+   if (!p) {
+-     p = new cSchedule(ChannelID);
++     p = new cSchedule(ChannelID, name);
+      Add(p);
+      }
+   return p;
+ }
+ 
+-const cSchedule *cSchedules::GetSchedule(tChannelID ChannelID) const
++const cSchedule *cSchedules::GetSchedule(tChannelID ChannelID, const char *name) const
+ {
+   ChannelID.ClrRid();
+   for (const cSchedule *p = First(); p; p = Next(p)) {
+-      if (p->ChannelID() == ChannelID)
+-         return p;
++      if (name && p->Name()){
++         if (p->ChannelID() == ChannelID && !strcmp(p->Name(), name))
++            return p;
++      }
++      else {
++         if (p->ChannelID() == ChannelID)
++        return p;
+       }
++  }
+   return NULL;
+ }
+ 
+@@ -1344,7 +1352,7 @@ const cSchedule *cSchedules::GetSchedule
+   // "What's on now/next?" menus.
+   static cSchedule DummySchedule(tChannelID::InvalidID);
+   if (!Channel->schedule)
+-     Channel->schedule = GetSchedule(Channel->GetChannelID());
++     Channel->schedule = GetSchedule(Channel->GetChannelID(), Channel->Name());
+   if (!Channel->schedule)
+      Channel->schedule = &DummySchedule;
+   if (Channel->schedule == &DummySchedule && AddIfMissing) {
+diff -Naurp vdr-2.3.8/epg.h vdr-2.3.8-patch/epg.h
+--- vdr-2.3.8/epg.h	2017-05-28 15:59:20.000000000 +0300
++++ vdr-2.3.8-patch/epg.h	2017-07-04 20:29:37.000000000 +0300
+@@ -151,6 +151,7 @@ class cSchedule : public cListObject  {
+ private:
+   static cMutex numTimersMutex; // Protects numTimers, because it might be accessed from parallel read locks
+   tChannelID channelID;
++  char *name;
+   cList<cEvent> events;
+   cHash<cEvent> eventsHashID;
+   cHash<cEvent> eventsHashStartTime;
+@@ -159,7 +160,9 @@ private:
+   int modified;
+   time_t presentSeen;
+ public:
+-  cSchedule(tChannelID ChannelID);
++  const char *Name (void) const { return name; }
++  cSchedule(tChannelID ChannelID, char *Name = NULL);
++  void SetName(char *Name) { name = Name; }
+   tChannelID ChannelID(void) const { return channelID; }
+   bool Modified(int &State) const { bool Result = State != modified; State = modified; return Result; }
+   time_t PresentSeen(void) const { return presentSeen; }
+@@ -208,8 +211,8 @@ public:
+   static void ResetVersions(void);
+   static bool Dump(FILE *f = NULL, const char *Prefix = "", eDumpMode DumpMode = dmAll, time_t AtTime = 0);
+   static bool Read(FILE *f = NULL);
+-  cSchedule *AddSchedule(tChannelID ChannelID);
+-  const cSchedule *GetSchedule(tChannelID ChannelID) const;
++  cSchedule *AddSchedule(tChannelID ChannelID, char *name = NULL);
++  const cSchedule *GetSchedule(tChannelID ChannelID, const char *name = NULL) const;
+   const cSchedule *GetSchedule(const cChannel *Channel, bool AddIfMissing = false) const;
+   };
+ 
+diff -Naurp vdr-2.3.8/nit.c vdr-2.3.8-patch/nit.c
+--- vdr-2.3.8/nit.c	2016-12-23 16:16:59.000000000 +0200
++++ vdr-2.3.8-patch/nit.c	2017-07-04 20:38:30.000000000 +0300
+@@ -119,7 +119,7 @@ void cNitFilter::Process(u_short Pid, u_
+                     bool found = false;
+                     bool forceTransponderUpdate = false;
+                     for (cChannel *Channel = Channels->First(); Channel; Channel = Channels->Next(Channel)) {
+-                        if (!Channel->GroupSep() && Channel->Source() == Source && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
++                        if (!Channel->GroupSep() && Channel->Source() == Source && Channel->Transponder() == Transponder() && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
+                            int transponder = Channel->Transponder();
+                            found = true;
+                            if (!ISTRANSPONDER(cChannel::Transponder(Frequency, dtp.Polarization()), transponder)) {
+@@ -154,7 +154,7 @@ void cNitFilter::Process(u_short Pid, u_
+             case SI::S2SatelliteDeliverySystemDescriptorTag: {
+                  if (Setup.UpdateChannels >= 5) {
+                     for (cChannel *Channel = Channels->First(); Channel; Channel = Channels->Next(Channel)) {
+-                        if (!Channel->GroupSep() && cSource::IsSat(Channel->Source()) && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
++                        if (!Channel->GroupSep() && cSource::IsSat(Channel->Source()) && Channel->Transponder() == Transponder() && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
+                            SI::S2SatelliteDeliverySystemDescriptor *sd = (SI::S2SatelliteDeliverySystemDescriptor *)d;
+                            cDvbTransponderParameters dtp(Channel->Parameters());
+                            dtp.SetSystem(DVB_SYSTEM_2);
+@@ -182,7 +182,7 @@ void cNitFilter::Process(u_short Pid, u_
+                     bool found = false;
+                     bool forceTransponderUpdate = false;
+                     for (cChannel *Channel = Channels->First(); Channel; Channel = Channels->Next(Channel)) {
+-                        if (!Channel->GroupSep() && Channel->Source() == Source && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
++                        if (!Channel->GroupSep() && Channel->Source() == Source && Channel->Transponder() == Transponder() && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
+                            int transponder = Channel->Transponder();
+                            found = true;
+                            if (!ISTRANSPONDER(Frequency / 1000, transponder)) {
+@@ -238,7 +238,7 @@ void cNitFilter::Process(u_short Pid, u_
+                     bool found = false;
+                     bool forceTransponderUpdate = false;
+                     for (cChannel *Channel = Channels->First(); Channel; Channel = Channels->Next(Channel)) {
+-                        if (!Channel->GroupSep() && Channel->Source() == Source && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
++                        if (!Channel->GroupSep() && Channel->Source() == Source && Channel->Transponder() == Transponder() && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
+                            int transponder = Channel->Transponder();
+                            found = true;
+                            if (!ISTRANSPONDER(Frequency / 1000000, transponder)) {
+@@ -277,7 +277,7 @@ void cNitFilter::Process(u_short Pid, u_
+                         if (Setup.UpdateChannels >= 5) {
+                            for (cChannel *Channel = Channels->First(); Channel; Channel = Channels->Next(Channel)) {
+                                int Source = cSource::FromData(cSource::stTerr);
+-                               if (!Channel->GroupSep() && Channel->Source() == Source && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
++                               if (!Channel->GroupSep() && Channel->Source() == Source && Channel->Transponder() == Transponder() && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
+                                   SI::T2DeliverySystemDescriptor *td = (SI::T2DeliverySystemDescriptor *)d;
+                                   int Frequency = Channel->Frequency();
+                                   int SymbolRate = Channel->Srate();
+@@ -314,7 +314,7 @@ void cNitFilter::Process(u_short Pid, u_
+                            int lcn = LogicalChannel.getLogicalChannelNumber();
+                            int sid = LogicalChannel.getServiceId();
+                            for (cChannel *Channel = Channels->First(); Channel; Channel = Channels->Next(Channel)) {
+-                               if (!Channel->GroupSep() && Channel->Sid() == sid && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
++                               if (!Channel->GroupSep() && Channel->Transponder() == Transponder() && Channel->Sid() == sid && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
+                                   ChannelsModified |= Channel->SetLcn(lcn);
+                                   break;
+                                   }
+@@ -332,7 +332,7 @@ void cNitFilter::Process(u_short Pid, u_
+                            int lcn = HdSimulcastLogicalChannel.getLogicalChannelNumber();
+                            int sid = HdSimulcastLogicalChannel.getServiceId();
+                            for (cChannel *Channel = Channels->First(); Channel; Channel = Channels->Next(Channel)) {
+-                               if (!Channel->GroupSep() && Channel->Sid() == sid && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
++                               if (!Channel->GroupSep() && Channel->Transponder() == Transponder() && Channel->Sid() == sid && Channel->Nid() == ts.getOriginalNetworkId() && Channel->Tid() == ts.getTransportStreamId()) {
+                                   ChannelsModified |= Channel->SetLcn(lcn);
+                                   break;
+                                   }
+diff -Naurp vdr-2.3.8/sdt.c vdr-2.3.8-patch/sdt.c
+--- vdr-2.3.8/sdt.c	2015-08-02 14:33:23.000000000 +0300
++++ vdr-2.3.8-patch/sdt.c	2017-07-04 20:42:33.000000000 +0300
+@@ -62,7 +62,7 @@ void cSdtFilter::Process(u_short Pid, u_
+   bool ChannelsModified = false;
+   SI::SDT::Service SiSdtService;
+   for (SI::Loop::Iterator it; sdt.serviceLoop.getNext(SiSdtService, it); ) {
+-      cChannel *Channel = Channels->GetByChannelID(tChannelID(source, sdt.getOriginalNetworkId(), sdt.getTransportStreamId(), SiSdtService.getServiceId()));
++      cChannel *Channel = Channels->GetByServiceID(Source(), Transponder(), SiSdtService.getServiceId());
+       if (!Channel)
+          Channel = Channels->GetByChannelID(tChannelID(source, 0, Transponder(), SiSdtService.getServiceId()));
+       if (Channel)
+@@ -106,7 +106,7 @@ void cSdtFilter::Process(u_short Pid, u_
+                         char *pp = compactspace(ProviderNameBuf);
+                         if (Channel) {
+                            ChannelsModified |= Channel->SetId(Channels, sdt.getOriginalNetworkId(), sdt.getTransportStreamId(), SiSdtService.getServiceId());
+-                           if (Setup.UpdateChannels == 1 || Setup.UpdateChannels >= 3)
++                           if ((Setup.UpdateChannels == 1 || Setup.UpdateChannels >= 3) && Channel->Transponder() == Transponder())
+                               ChannelsModified |= Channel->SetName(pn, ps, pp);
+                            // Using SiSdtService.getFreeCaMode() is no good, because some
+                            // tv stations set this flag even for non-encrypted channels :-(
+@@ -170,9 +170,9 @@ void cSdtFilter::Process(u_short Pid, u_
+       }
+   if (sdt.getSectionNumber() == sdt.getLastSectionNumber()) {
+      if (Setup.UpdateChannels == 1 || Setup.UpdateChannels >= 3) {
+-        ChannelsModified |= Channels->MarkObsoleteChannels(source, sdt.getOriginalNetworkId(), sdt.getTransportStreamId());
++        ChannelsModified |= Channels->MarkObsoleteChannels(source, sdt.getOriginalNetworkId(), sdt.getTransportStreamId(), Transponder());
+         if (source != Source())
+-           ChannelsModified |= Channels->MarkObsoleteChannels(Source(), sdt.getOriginalNetworkId(), sdt.getTransportStreamId());
++           ChannelsModified |= Channels->MarkObsoleteChannels(Source(), sdt.getOriginalNetworkId(), sdt.getTransportStreamId(), Transponder());
+         }
+      }
+   StateKey.Remove(ChannelsModified);

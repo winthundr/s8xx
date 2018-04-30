@@ -1,0 +1,9 @@
+diff -Naurp kodi-17.3-147cec4/xbmc/powermanagement/PowerManager.cpp kodi-17.3-147cec4-patch/xbmc/powermanagement/PowerManager.cpp
+--- kodi-17.3-147cec4/xbmc/powermanagement/PowerManager.cpp	2017-06-01 12:48:48.000000000 +0300
++++ kodi-17.3-147cec4-patch/xbmc/powermanagement/PowerManager.cpp	2017-06-01 12:54:54.000000000 +0300
+@@ -313,5 +313,4 @@ void CPowerManager::OnLowBattery()
+ void CPowerManager::SettingOptionsShutdownStatesFiller(const CSetting *setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data)
+ {
+   list.push_back(make_pair(g_localizeStrings.Get(13005), POWERSTATE_SHUTDOWN));
+-  list.push_back(make_pair(g_localizeStrings.Get(13011), POWERSTATE_SUSPEND));
+ }

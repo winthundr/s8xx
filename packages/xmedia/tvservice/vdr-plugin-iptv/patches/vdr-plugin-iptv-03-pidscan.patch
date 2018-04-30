@@ -1,0 +1,160 @@
+diff -Naurp vdr-plugin-iptv-0fe1cb7/device.c vdr-plugin-iptv-0fe1cb7-patch/device.c
+--- vdr-plugin-iptv-0fe1cb7/device.c	2017-06-24 23:20:33.000000000 +0300
++++ vdr-plugin-iptv-0fe1cb7-patch/device.c	2017-07-04 21:22:40.000000000 +0300
+@@ -296,9 +296,9 @@ bool cIptvDevice::SetChannelDevice(const
+   if (pIptvStreamerM && pIptvStreamerM->SetSource(itp.Address(), itp.Parameter(), deviceIndexM, protocol)) {
+      channelM = *channelP;
+      if (sidScanEnabledM && pSidScannerM && IptvConfig.GetSectionFiltering())
+-        pSidScannerM->SetChannel(channelM.GetChannelID());
++        pSidScannerM->SetChannel(channelM.GetChannelID(), channelP->Parameters());
+      if (pidScanEnabledM && pPidScannerM)
+-        pPidScannerM->SetChannel(channelM.GetChannelID());
++       pPidScannerM->SetChannel(channelM.GetChannelID(), channelP->Parameters());
+      }
+   return true;
+ }
+diff -Naurp vdr-plugin-iptv-0fe1cb7/Makefile vdr-plugin-iptv-0fe1cb7-patch/Makefile
+--- vdr-plugin-iptv-0fe1cb7/Makefile	2017-07-04 21:16:23.000000000 +0300
++++ vdr-plugin-iptv-0fe1cb7-patch/Makefile	2017-07-04 21:24:50.000000000 +0300
+@@ -12,6 +12,8 @@
+ 
+ PLUGIN = iptv
+ 
++-include $(VDRDIR)/Make.config
++
+ ### The version number of this plugin (taken from the main source file):
+ 
+ VERSION = $(shell grep 'const char VERSION\[\] *=' $(PLUGIN).c | awk '{ print $$5 }' | sed -e 's/[";]//g')
+diff -Naurp vdr-plugin-iptv-0fe1cb7/pidscanner.c vdr-plugin-iptv-0fe1cb7-patch/pidscanner.c
+--- vdr-plugin-iptv-0fe1cb7/pidscanner.c	2017-06-24 23:20:33.000000000 +0300
++++ vdr-plugin-iptv-0fe1cb7-patch/pidscanner.c	2017-07-04 22:01:10.000000000 +0300
+@@ -20,7 +20,8 @@ cPidScanner::cPidScanner(void)
+   vPidM(0xFFFF),
+   aPidM(0xFFFF),
+   numVpidsM(0),
+-  numApidsM(0)
++  numApidsM(0),
++  parameters(NULL)
+ {
+   debug1("%s", __PRETTY_FUNCTION__);
+ }
+@@ -30,7 +31,7 @@ cPidScanner::~cPidScanner()
+   debug1("%s", __PRETTY_FUNCTION__);
+ }
+ 
+-void cPidScanner::SetChannel(const tChannelID &channelIdP)
++void cPidScanner::SetChannel(const tChannelID &channelIdP, const char *Parameters)
+ {
+   debug1("%s (%s)", __PRETTY_FUNCTION__, *channelIdP.ToString());
+   channelIdM = channelIdP;
+@@ -39,6 +40,7 @@ void cPidScanner::SetChannel(const tChan
+   aPidM = 0xFFFF;
+   numApidsM = 0;
+   processM = true;
++  parameters = Parameters;
+ }
+ 
+ void cPidScanner::Process(const uint8_t* bufP)
+@@ -114,7 +116,13 @@ void cPidScanner::Process(const uint8_t*
+            if (!Channels)
+               return;
+            bool ChannelsModified = false;
+-           cChannel *IptvChannel = Channels->GetByChannelID(channelIdM);
++           cChannel *IptvChannel = NULL;
++           for (cChannel *ch = Channels->First(); ch; ch = Channels->Next(ch)) {
++              if(cSource::IsType(ch->Source(), 'I') && !strcmp(ch->Parameters(), parameters) && channelIdM == ch->GetChannelID()){
++                 IptvChannel = ch;
++                 break;
++              }
++           }
+            if (IptvChannel) {
+               int Apids[MAXAPIDS + 1] = { 0 }; // these lists are zero-terminated
+               int Atypes[MAXAPIDS + 1] = { 0 };
+diff -Naurp vdr-plugin-iptv-0fe1cb7/pidscanner.h vdr-plugin-iptv-0fe1cb7-patch/pidscanner.h
+--- vdr-plugin-iptv-0fe1cb7/pidscanner.h	2017-06-24 23:20:33.000000000 +0300
++++ vdr-plugin-iptv-0fe1cb7-patch/pidscanner.h	2017-07-04 21:36:52.000000000 +0300
+@@ -28,11 +28,12 @@ private:
+   int aPidM;
+   int numVpidsM;
+   int numApidsM;
++  cString parameters;
+ 
+ public:
+   cPidScanner(void);
+   ~cPidScanner();
+-  void SetChannel(const tChannelID &channelIdP);
++  void SetChannel(const tChannelID &channelIdP, const char *Parameters);
+   void Process(const uint8_t* bufP);
+   void Open()  { debug1("%s", __PRETTY_FUNCTION__); timeoutM.Set(PIDSCANNER_TIMEOUT_IN_MS); }
+   void Close() { debug1("%s", __PRETTY_FUNCTION__); timeoutM.Set(0); }
+diff -Naurp vdr-plugin-iptv-0fe1cb7/sidscanner.c vdr-plugin-iptv-0fe1cb7-patch/sidscanner.c
+--- vdr-plugin-iptv-0fe1cb7/sidscanner.c	2017-06-24 23:20:33.000000000 +0300
++++ vdr-plugin-iptv-0fe1cb7-patch/sidscanner.c	2017-07-04 22:01:58.000000000 +0300
+@@ -15,6 +15,7 @@ cSidScanner::cSidScanner(void)
+   sidFoundM(false),
+   nidFoundM(false),
+   tidFoundM(false),
++  parameters(NULL),
+   isActiveM(false)
+ {
+   debug1("%s", __PRETTY_FUNCTION__);
+@@ -27,13 +28,14 @@ cSidScanner::~cSidScanner()
+   debug1("%s", __PRETTY_FUNCTION__);
+ }
+ 
+-void cSidScanner::SetChannel(const tChannelID &channelIdP)
++void cSidScanner::SetChannel(const tChannelID &channelIdP, const char *Parameters)
+ {
+   debug1("%s (%s)", __PRETTY_FUNCTION__, *channelIdP.ToString());
+   channelIdM = channelIdP;
+   sidFoundM = false;
+   nidFoundM = false;
+   tidFoundM = false;
++  parameters = Parameters;
+ }
+ 
+ void cSidScanner::Process(u_short pidP, u_char tidP, const u_char *dataP, int lengthP)
+@@ -94,7 +96,13 @@ void cSidScanner::Process(u_short pidP,
+      if (!Channels)
+         return;
+      bool ChannelsModified = false;
+-     cChannel *IptvChannel = Channels->GetByChannelID(channelIdM);
++     cChannel *IptvChannel = NULL;
++     for (cChannel *ch = Channels->First(); ch; ch = Channels->Next(ch)) {
++        if(cSource::IsType(ch->Source(), 'I') && !strcmp(ch->Parameters(), parameters) && channelIdM == ch->GetChannelID()){
++           IptvChannel = ch;
++           break;
++        }
++     }
+      if (IptvChannel)
+         ChannelsModified |= IptvChannel->SetId(Channels, (newNid < 0) ? IptvChannel->Nid() : newNid,
+                                                (newTid < 0) ? IptvChannel->Tid() : newTid,
+@@ -102,7 +110,7 @@ void cSidScanner::Process(u_short pidP,
+      StateKey.Remove(ChannelsModified);
+      }
+   if (sidFoundM && nidFoundM && tidFoundM) {
+-     SetChannel(tChannelID::InvalidID);
++     SetChannel(tChannelID::InvalidID, NULL);
+      SetStatus(false);
+      }
+ }
+diff -Naurp vdr-plugin-iptv-0fe1cb7/sidscanner.h vdr-plugin-iptv-0fe1cb7-patch/sidscanner.h
+--- vdr-plugin-iptv-0fe1cb7/sidscanner.h	2017-06-24 23:20:33.000000000 +0300
++++ vdr-plugin-iptv-0fe1cb7-patch/sidscanner.h	2017-07-04 21:42:47.000000000 +0300
+@@ -20,6 +20,7 @@ private:
+   bool nidFoundM;
+   bool tidFoundM;
+   bool isActiveM;
++  cString parameters;
+ 
+ protected:
+   virtual void Process(u_short pidP, u_char tidP, const u_char *dataP, int lengthP);
+@@ -27,7 +28,7 @@ protected:
+ public:
+   cSidScanner(void);
+   ~cSidScanner();
+-  void SetChannel(const tChannelID &channelIdP);
++  void SetChannel(const tChannelID &channelIdP, const char *Parameters);
+   void Open()  { debug1("%s", __PRETTY_FUNCTION__); isActiveM = true; }
+   void Close() { debug1("%s", __PRETTY_FUNCTION__); isActiveM = false; }
+ };

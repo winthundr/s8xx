@@ -1,0 +1,17 @@
+#!/bin/sh
+################################################################################
+#      This file is part of Alex@ELEC - http://www.alexelec.in.ua
+#      Copyright (C) 2011-2017 Alexandr Zuyev (alex@alexelec.in.ua)
+################################################################################
+
+AVL_ARG="$1"
+DVB_DRIVER=$(ls -l /storage/.modules/* | awk -F\/ '{print $7}' |  awk -F\- '{print $2}')
+DVB_PRESET=$(cat /proc/device-tree/dvb/dev_name)
+
+if [ "$DVB_PRESET" == "wetek-dvb" -a "$DVB_DRIVER" == "mbcc" ]; then
+  if [ "$AVL_ARG" == "del" ]; then
+      /sbin/rmmod wetekdvb
+  else
+      /sbin/modprobe wetekdvb
+  fi
+fi

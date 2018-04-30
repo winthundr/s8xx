@@ -1,0 +1,13 @@
+diff -Naurp emulationstation-268e6c8/es-core/src/Log.cpp emulationstation-268e6c8-patch/es-core/src/Log.cpp
+--- emulationstation-268e6c8/es-core/src/Log.cpp	2017-05-11 19:00:16.000000000 +0300
++++ emulationstation-268e6c8-patch/es-core/src/Log.cpp	2017-05-11 19:15:45.000000000 +0300
+@@ -14,8 +14,7 @@ LogLevel Log::getReportingLevel()
+ 
+ std::string Log::getLogPath()
+ {
+-	std::string home = getHomePath();
+-	return home + "/.emulationstation/es_log.txt";
++	return "/var/log/emustation.log";
+ }
+ 
+ void Log::setReportingLevel(LogLevel level)

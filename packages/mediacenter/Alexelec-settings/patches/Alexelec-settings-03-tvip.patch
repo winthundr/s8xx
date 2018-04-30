@@ -1,0 +1,130 @@
+diff -Naurp Alexelec-settings-30c0064/src/defaults.py Alexelec-settings-30c0064-patch/src/defaults.py
+--- Alexelec-settings-30c0064/src/defaults.py	2018-02-03 12:25:25.000000000 +0200
++++ Alexelec-settings-30c0064-patch/src/defaults.py	2018-02-02 20:32:29.000000000 +0200
+@@ -86,6 +86,7 @@ ace = {
+     'ACE_LIST_MOUNT'  : '/tmp/usbmounts.list',
+     'ACE_GET_SD'      : "/bin/mount | grep '/dev/mmcblk.* on /var/media' | awk '{print $1, $3}' | sed 's|/var/media/||' > /tmp/sdmounts.list",
+     'ACE_LIST_SD'     : '/tmp/sdmounts.list',
++    'ACE_GET_SRC'     : "%s/ace-get.sh" % SCRIPT_DIR,
+     #ACEPROXY
+     'D_ACEPROXY_LOGIN'  : '',
+     'D_ACEPROXY_PASSW'  : '',
+diff -Naurp Alexelec-settings-30c0064/src/resources/bin/ace-get.sh Alexelec-settings-30c0064-patch/src/resources/bin/ace-get.sh
+--- Alexelec-settings-30c0064/src/resources/bin/ace-get.sh	1970-01-01 03:00:00.000000000 +0300
++++ Alexelec-settings-30c0064-patch/src/resources/bin/ace-get.sh	2018-02-03 12:30:24.000000000 +0200
+@@ -0,0 +1,29 @@
++#!/bin/sh
++################################################################################
++#      This file is part of Alex@ELEC - http://www.alexelec.in.ua
++#      Copyright (C) 2011-present Alexandr Zuyev (alex@alexelec.in.ua)
++################################################################################
++
++URL_LAST="https://raw.githubusercontent.com/AlexELEC/acestream-aml/master/latest"
++URL_MAIN="https://github.com/AlexELEC/acestream-aml/releases/download"
++
++ACE_DIR="/storage/.config/acestream"
++TEMP_DIR="/storage/.kodi/temp"
++
++################################ MAIN ##########################################
++
++VER=$(curl -s "$URL_LAST")
++
++# download URL
++  if [ "$1" == "url" ] ; then
++      echo "$URL_MAIN/$VER/acestream-aml-$VER.tar.bz2"
++
++# unpack
++  elif [ "$1" == "unpack" ] ; then
++      mkdir -p $ACE_DIR
++      tar -jxf $TEMP_DIR/acestream-aml-$VER.tar.bz2 -C $ACE_DIR
++      rm -f $TEMP_DIR/acestream-aml-$VER.tar.bz2
++      touch $ACE_DIR/installed.acestream
++  fi
++
++exit 0
+diff -Naurp Alexelec-settings-30c0064/src/resources/lib/modules/ace.py Alexelec-settings-30c0064-patch/src/resources/lib/modules/ace.py
+--- Alexelec-settings-30c0064/src/resources/lib/modules/ace.py	2017-11-06 16:44:25.000000000 +0200
++++ Alexelec-settings-30c0064-patch/src/resources/lib/modules/ace.py	2018-02-03 12:34:58.000000000 +0200
+@@ -1,11 +1,13 @@
++# -*- coding: utf-8 -*-
+ ################################################################################
+ #      This file is part of Alex@ELEC - http://www.alexelec.in.ua
+ #      Copyright (C) 2011-2017 Alexandr Zuyev (alex@alexelec.in.ua)
+ ################################################################################
+-# -*- coding: utf-8 -*-
+ 
+ import os
+ import glob
++import xbmc
++import xbmcgui
+ 
+ class ace:
+ 
+@@ -20,6 +22,7 @@ class ace:
+     ACE_LIST_MOUNT = None
+     ACE_GET_SD = None
+     ACE_LIST_SD = None
++    ACE_GET_SRC = None
+     D_ACE_CLEAN_CACHE = None
+     D_ACEPROXY_LOGIN = None
+     D_ACEPROXY_PASSW = None
+@@ -404,8 +407,21 @@ class ace:
+             if 'listItem' in kwargs:
+                 self.set_value(kwargs['listItem'])
+             options = {}
+-            state = 1
++            state = 0
+             if self.struct['acestream']['settings']['enable_acestream']['value'] == '1':
++
++                if not os.path.exists('/storage/.config/acestream/installed.acestream'):
++                    ace_status = self.get_ace_source()
++                    if ace_status == 'OK':
++                        self.oe.notify(self.oe._(32363), 'Run AceStream engine...')
++                    else:
++                        self.struct['acestream']['settings']['enable_acestream']['value'] = '0'
++                        self.oe.set_busy(0)
++                        xbmcDialog = xbmcgui.Dialog()
++                        answer = xbmcDialog.ok('Install AceStream',
++                            'Error: The program is not installed, try again.')
++                        return
++
+                 options['ACE_LOGIN'] = '"%s"' % self.struct['acestream']['settings']['ace_login']['value']
+                 options['ACE_PASSW'] = '"%s"' % self.struct['acestream']['settings']['ace_passw']['value']
+                 options['ACE_MOUNT_USB'] = '"%s"' % self.struct['acestream']['settings']['ace_mount_usb']['value']
+@@ -413,8 +429,8 @@ class ace:
+                 options['ACE_CLEAN_CACHE'] = '"%s"' % self.struct['acestream']['settings']['ace_clean_cache']['value']
+                 options['ACE_DEBUG'] = '"%s"' % self.struct['acestream']['settings']['ace_debug']['value']
+                 options['ACE_WAIT'] = '"%s"' % self.struct['acestream']['settings']['ace_wait']['value']
+-            else:
+-                state = 0
++                state = 1
++
+             self.oe.set_service('acestream', options, state)
+             self.oe.set_busy(0)
+             self.oe.dbg_log('ace::initialize_acestream', 'exit_function', 0)
+@@ -422,6 +438,25 @@ class ace:
+             self.oe.set_busy(0)
+             self.oe.dbg_log('ace::initialize_acestream', 'ERROR: (%s)' % repr(e), 4)
+ 
++    def get_ace_source(self, listItem=None, silent=False):
++        try:
++            self.oe.dbg_log('ace::get_ace_source', 'enter_function', 0)
++            ace_url = self.oe.execute(self.ACE_GET_SRC + ' url', 1).strip()
++            self.download_file = ace_url
++            self.oe.set_busy(0)
++            if hasattr(self, 'download_file'):
++                downloaded = self.oe.download_file(self.download_file, self.oe.TEMP + self.download_file.split('/')[-1], silent)
++                if not downloaded is None:
++                    self.oe.notify(self.oe._(32363), 'Unpack AceStream...')
++                    self.oe.set_busy(1)
++                    self.oe.execute(self.ACE_GET_SRC + ' unpack', 0)
++                    self.oe.dbg_log('ace::get_ace_source', 'exit_function', 0)
++                    return 'OK'
++            self.oe.dbg_log('ace::get_ace_source', 'exit_function', 0)
++            return 'ERROR'
++        except Exception, e:
++            self.oe.dbg_log('ace::get_ace_source', 'ERROR: (%s)' % repr(e), 4)
++
+     def initialize_aceproxy(self, **kwargs):
+         try:
+             self.oe.dbg_log('ace::initialize_aceproxy', 'enter_function', 0)

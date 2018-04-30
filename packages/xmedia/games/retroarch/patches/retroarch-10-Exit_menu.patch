@@ -1,0 +1,31 @@
+diff -Naurp retroarch-e7061a8/command.c retroarch-e7061a8-patch/command.c
+--- retroarch-e7061a8/command.c	2017-05-12 04:45:49.000000000 +0300
++++ retroarch-e7061a8-patch/command.c	2017-05-12 11:28:44.000000000 +0300
+@@ -17,6 +17,7 @@
+ #include <stdio.h>
+ #include <string.h>
+ #include <ctype.h>
++#include <fcntl.h>
+ 
+ #ifdef _WIN32
+ #include <direct.h>
+@@ -1857,9 +1858,6 @@ bool command_event(enum event_command cm
+          break;
+       case CMD_EVENT_LOAD_CORE:
+          command_event(CMD_EVENT_LOAD_CORE_PERSIST, NULL);
+-#ifndef HAVE_DYNAMIC
+-         command_event(CMD_EVENT_QUIT, NULL);
+-#endif
+          break;
+       case CMD_EVENT_LOAD_STATE:
+          {
+@@ -1975,6 +1973,9 @@ bool command_event(enum event_command cm
+          }
+          break;
+       case CMD_EVENT_QUIT:
++         remove("/var/lock/start.retro");
++         creat("/var/lock/start.games", S_IRUSR|S_IROTH);
++         system("systemctl start emustation.service");
+          return retroarch_main_quit();
+       case CMD_EVENT_CHEEVOS_HARDCORE_MODE_TOGGLE:
+ #ifdef HAVE_CHEEVOS

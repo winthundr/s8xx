@@ -1,0 +1,11 @@
+--- live/setup.cpp.orig	2015-02-13 23:48:24.000000000 +0100
++++ live/setup.cpp	2015-09-14 17:09:38.443441085 +0200
+@@ -36,7 +36,7 @@
+ 		m_adminLogin("admin"),
+ 		m_channelGroups( "" ),
+ 		m_scheduleDuration( "8" ),
+-		m_theme("marine"),
++		m_theme("mld"),
+ 		m_lastwhatsonlistmode("detail"),
+ 		m_lastsortingmode("nameasc"),
+ 		m_tntnetloglevel("WARN"),

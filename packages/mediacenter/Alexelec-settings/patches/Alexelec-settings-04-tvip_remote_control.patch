@@ -1,0 +1,122 @@
+diff -Naurp Alexelec-settings-30c0064/language/English/strings.po Alexelec-settings-30c0064-patch/language/English/strings.po
+--- Alexelec-settings-30c0064/language/English/strings.po	2018-02-13 11:10:43.000000000 +0200
++++ Alexelec-settings-30c0064-patch/language/English/strings.po	2018-02-13 11:28:07.000000000 +0200
+@@ -1156,6 +1156,22 @@ msgctxt "#2864"
+ msgid "Start TVIP from the first channel."
+ msgstr ""
+ 
++msgctxt "#32865"
++msgid "Delay RC start:"
++msgstr ""
++
++msgctxt "#2865"
++msgid "Delay before starting the configuration of the remote control."
++msgstr ""
++
++msgctxt "#32866"
++msgid "Debug"
++msgstr ""
++
++msgctxt "#2866"
++msgid "Log of work of TVIP."
++msgstr ""
++
+ ########## ACESTREAM #########
+ 
+ msgctxt "#34000"
+diff -Naurp Alexelec-settings-30c0064/language/Russian/strings.po Alexelec-settings-30c0064-patch/language/Russian/strings.po
+--- Alexelec-settings-30c0064/language/Russian/strings.po	2018-02-13 11:10:43.000000000 +0200
++++ Alexelec-settings-30c0064-patch/language/Russian/strings.po	2018-02-13 11:32:40.000000000 +0200
+@@ -1076,6 +1076,22 @@ msgctxt "#2864"
+ msgid "Start TVIP from the first channel."
+ msgstr "Начинать показ с первого канала в списке."
+ 
++msgctxt "#32865"
++msgid "Delay RC start:"
++msgstr "Задержка ДУ:"
++
++msgctxt "#2865"
++msgid "Delay before starting the configuration of the remote control."
++msgstr "Задержка перед запуском конфигурации пульта ДУ (секунд)."
++
++msgctxt "#32866"
++msgid "Debug"
++msgstr "Отладка"
++
++msgctxt "#2866"
++msgid "Log of work of TVIP."
++msgstr "Вести журнал работы TVIP (/var/log/tvip.log)."
++
+ ########## ACESTREAM #########
+ 
+ msgctxt "#34000"
+diff -Naurp Alexelec-settings-30c0064/src/defaults.py Alexelec-settings-30c0064-patch/src/defaults.py
+--- Alexelec-settings-30c0064/src/defaults.py	2018-02-13 11:10:43.000000000 +0200
++++ Alexelec-settings-30c0064-patch/src/defaults.py	2018-02-13 11:18:20.000000000 +0200
+@@ -66,6 +66,8 @@ services = {
+     'D_TVIP_M3U'        : '',
+     'D_TVIP_UPDATE'     : '0',
+     'D_TVIP_LAST'       : '0',
++    'D_TVIP_RCTIME'     : '4',
++    'D_TVIP_DEBUG'      : '0',
+     }
+ 
+ ################################################################################
+diff -Naurp Alexelec-settings-30c0064/src/resources/lib/modules/services.py Alexelec-settings-30c0064-patch/src/resources/lib/modules/services.py
+--- Alexelec-settings-30c0064/src/resources/lib/modules/services.py	2018-02-13 11:10:43.000000000 +0200
++++ Alexelec-settings-30c0064-patch/src/resources/lib/modules/services.py	2018-02-13 11:21:07.000000000 +0200
+@@ -49,6 +49,8 @@ class services:
+     D_TVIP_LAST = None
+     D_TVIP_ACT_PATCH = None
+     D_TVIP_UPDATE = None
++    D_TVIP_RCTIME = None
++    D_TVIP_DEBUG = None
+ 
+     menu = {'1': {
+         'name': 32001,
+@@ -482,6 +484,23 @@ class services:
+                             'type': 'bool',
+                             'InfoText': 2864,
+                             },
++                        'tvip_rctime': {
++                            'order': 5,
++                            'name': 32865,
++                            'value': '4',
++                            'values': ['3', '4', '5', '6', '7', '8', '9', '10'],
++                            'action': 'initialize_tvip',
++                            'type': 'multivalue',
++                            'InfoText': 2865,
++                            },
++                        'tvip_debug': {
++                            'order': 6,
++                            'name': 32866,
++                            'value': '0',
++                            'action': 'initialize_tvip',
++                            'type': 'bool',
++                            'InfoText': 2866,
++                            },
+                         },
+                     },
+                 }
+@@ -650,6 +669,12 @@ class services:
+             self.struct['tvip']['settings']['tvip_last']['value'] = \
+             self.oe.get_service_option('tvip', 'TVIP_LAST', self.D_TVIP_LAST).replace('"', '')
+ 
++            self.struct['tvip']['settings']['tvip_rctime']['value'] = \
++            self.oe.get_service_option('tvip', 'TVIP_RCTIME', self.D_TVIP_RCTIME).replace('"', '')
++
++            self.struct['tvip']['settings']['tvip_debug']['value'] = \
++            self.oe.get_service_option('tvip', 'TVIP_DEBUG', self.D_TVIP_DEBUG).replace('"', '')
++
+             self.oe.dbg_log('services::load_values', 'exit_function', 0)
+         except Exception, e:
+             self.oe.dbg_log('services::load_values', 'ERROR: (%s)' % repr(e))
+@@ -988,6 +1013,8 @@ class services:
+             options['TVIP_M3U'] = '"%s"' % self.struct['tvip']['settings']['tvip_m3u']['value']
+             options['TVIP_UPDATE'] = '"%s"' % self.struct['tvip']['settings']['tvip_update']['value']
+             options['TVIP_LAST'] = '"%s"' % self.struct['tvip']['settings']['tvip_last']['value']
++            options['TVIP_RCTIME'] = '"%s"' % self.struct['tvip']['settings']['tvip_rctime']['value']
++            options['TVIP_DEBUG'] = '"%s"' % self.struct['tvip']['settings']['tvip_debug']['value']
+             self.oe.set_service('tvip', options, state)   
+             self.oe.set_busy(0)
+             self.oe.dbg_log('services::initialize_tvip', 'exit_function', 0)

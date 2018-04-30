@@ -1,0 +1,19 @@
+diff -Naurp boblightd-479/src/clients/boblight-aml/boblight-aml.cpp boblightd-479-patch/src/clients/boblight-aml/boblight-aml.cpp
+--- boblightd-479/src/clients/boblight-aml/boblight-aml.cpp	2017-03-21 09:14:42.000000000 +0200
++++ boblightd-479-patch/src/clients/boblight-aml/boblight-aml.cpp	2017-03-21 09:20:37.000000000 +0200
+@@ -99,14 +99,8 @@ class CBoblightAddonSettings
+     bool loadBoblightAddonSettings()
+     {
+       bool ret = false;
+-      char *kodiHome = getenv(KODI_HOME_ENV_VAR);
+       //fallback to custom settings file in case boblight addon is not installed
+-      std::string settingsFile = "/storage/boblight-aml.xml";
+-
+-      if (kodiHome != NULL)
+-      {
+-        settingsFile = std::string(kodiHome) + "/.kodi/userdata/addon_data/script.xbmc.boblight/settings.xml";
+-      }
++      std::string settingsFile = "/storage/.config/boblight/boblight-aml.xml";
+ 
+       FILE *fd = fopen(settingsFile.c_str(), "r");
+ 

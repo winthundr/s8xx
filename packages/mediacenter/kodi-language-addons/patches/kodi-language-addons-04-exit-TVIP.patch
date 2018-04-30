@@ -1,0 +1,14 @@
+diff -Naurp kodi-language-addons-67cd53f/resource.language.ru_ru/resources/strings.po kodi-language-addons-67cd53f-patch/resource.language.ru_ru/resources/strings.po
+--- kodi-language-addons-67cd53f/resource.language.ru_ru/resources/strings.po	2017-10-14 09:52:15.000000000 +0300
++++ kodi-language-addons-67cd53f-patch/resource.language.ru_ru/resources/strings.po	2017-10-14 09:55:08.000000000 +0300
+@@ -4418,8 +4418,8 @@ msgid "Switch to Android"
+ msgstr "Переключить в Android"
+ 
+ msgctxt "#13011"
+-msgid "Suspend"
+-msgstr "Ждущий режим"
++msgid "TVIP"
++msgstr "TVIP"
+ 
+ msgctxt "#13012"
+ msgid "Games"

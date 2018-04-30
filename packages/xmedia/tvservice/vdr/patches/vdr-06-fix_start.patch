@@ -1,0 +1,37 @@
+diff -Naurp vdr-2.3.8/osd.c vdr-2.3.8-patch/osd.c
+--- vdr-2.3.8/osd.c	2015-09-10 17:12:06.000000000 +0300
++++ vdr-2.3.8-patch/osd.c	2017-07-22 19:13:59.000000000 +0300
+@@ -2027,8 +2027,6 @@ cOsd *cOsdProvider::NewOsd(int Left, int
+         }
+      return Osd;
+      }
+-  else
+-     esyslog("ERROR: no OSD provider available - using dummy OSD!");
+   return new cOsd(Left, Top, 999); // create a dummy cOsd, so that access won't result in a segfault
+ }
+ 
+diff -Naurp vdr-2.3.8/vdr.c vdr-2.3.8-patch/vdr.c
+--- vdr-2.3.8/vdr.c	2017-07-22 18:39:38.000000000 +0300
++++ vdr-2.3.8-patch/vdr.c	2017-07-22 19:32:53.000000000 +0300
+@@ -765,12 +765,6 @@ int main(int argc, char *argv[])
+   Folders.Load(AddDirectory(ConfigDirectory, "folders.conf"));
+   CamResponsesLoad(AddDirectory(ConfigDirectory, "camresponses.conf"), true);
+ 
+-  if (!*cFont::GetFontFileName(Setup.FontOsd)) {
+-     const char *msg = "no fonts available - OSD will not show any text!";
+-     fprintf(stderr, "vdr: %s\n", msg);
+-     esyslog("ERROR: %s", msg);
+-     }
+-
+   // Recordings:
+ 
+   cRecordings::Update();
+@@ -844,8 +838,6 @@ int main(int argc, char *argv[])
+   // Default skins:
+ 
+   new cSkinLCARS;
+-  new cSkinSTTNG;
+-  new cSkinClassic;
+   Skins.SetCurrent(Setup.OSDSkin);
+   cThemes::Load(Skins.Current()->Name(), Setup.OSDTheme, Skins.Current()->Theme());
+   CurrentSkin = Skins.Current();
