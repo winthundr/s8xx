@@ -1,11 +1,11 @@
 [Unit]
 Description=GUI switch service
-Before=kodi.service
+Before=kodi.service tvip.service
 After=var.mount userconfig.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/gui-switch.start
+ExecStart=-/bin/sh -c 'touch /var/lock/start.tvip'
 RemainAfterExit=yes
 
 [Install]
