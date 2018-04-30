@@ -1,6 +1,6 @@
 ################################################################################
 #      This file is part of Alex@ELEC - http://www.alexelec.in.ua
-#      Copyright (C) 2011-2017 Alexandr Zuyev (alex@alexelec.in.ua)
+#      Copyright (C) 2011-present Alexandr Zuyev (alex@alexelec.in.ua)
 ################################################################################
 
 PKG_NAME="mediacenter"
@@ -45,7 +45,6 @@ PKG_AUTORECONF="no"
   PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET pvr.iptvsimple.multi"
   PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET pvr.vdr.vnsi"
   PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET pvr.hts"
-  PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET pvr.dvblink"
   PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET pvr.vuplus"
   PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET pvr.stalker"
 
@@ -56,9 +55,3 @@ PKG_AUTORECONF="no"
 # kodi-binary-addons visualization
   PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET visualization.spectrum"
   PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET visualization.waveform"
-
-# audioencoder
-  PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET audioencoder.flac"
-  PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET audioencoder.lame"
-  PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET audioencoder.vorbis"
-  PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET audioencoder.wav"
